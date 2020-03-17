@@ -1,0 +1,66 @@
+[package]
+name = "rust_flow"
+version = "0.1.0"
+authors = ["Skareeg <skareeg@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# Basic Random Numbers
+rand = "0.7.3"
+bracket-noise = "0.7.0"
+
+#Binary and JSON serialization.
+serde = { version = "1.0.104", features = ["derive"] }
+bincode = "1.2.1"
+serde_json = "1.0.48"
+
+# Basic Logging
+log = "0.4.8"
+simplelog = "0.7.4"
+
+# Regex and time functionality.
+regex = "1.3.5"
+chrono = "0.4.11"
+humantime = "2.0.0"
+
+# Multithreading Utils
+num_cpus = "1.12.0"
+crossbeam = "0.7.3"
+rayon = "1.3.0"
+
+# Inline Array and Command Line Parser
+arrayvec = { version = "0.5.1", features = ["serde", "array-sizes-33-128", "array-sizes-129-255"] }
+clap = "2.33.0"
+
+# UUID and itertools
+uuid = { version = "0.8.1", features = ["serde", "v4"] }
+itertools = "0.9.0"
+
+# File System Walking and Default Locations
+walkdir = "2.3.1"
+dirs = "2.0.2"
+
+# Actor System that is Remote Capable
+axiom = "0.2.1"
+
+# Linear Algebra
+nalgebra = "0.20.0"
+
+# Image Saving and Loading
+image = "0.23.2"
+
+# Scene Saving and Loading
+gltf = { version = "0.15.1", features = ["extras","names"] }
+
+# Audio
+cpal = "0.11.0"
+
+# Video
+vulkano = "0.18.0"
+vulkano-shaders = "0.18.0"
+
+# UI
+conrod = "0.61.1"
+conrod_vulkano = "0.69.0"
