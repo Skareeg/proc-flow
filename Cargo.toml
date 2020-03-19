@@ -4,6 +4,14 @@ version = "0.1.0"
 authors = ["Skareeg <skareeg@gmail.com>"]
 edition = "2018"
 
+[lib]
+name = "rust_flow_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rust_flow_client"
+path = "src/main.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
