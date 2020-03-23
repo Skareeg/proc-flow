@@ -1,6 +1,6 @@
-extern crate rust_flow_lib;
+extern crate proc_flow_lib;
 
-use rust_flow_lib::test;
+use proc_flow_lib::test;
 
 fn main() {
     println!("Hello, world!");
