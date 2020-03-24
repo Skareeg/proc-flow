@@ -20,6 +20,9 @@ rand = "0.7.3"
 bracket-noise = "0.7.0"
 bracket-color = "0.7.0"
 
+# Map that can store Anys
+anymap = "0.12.1"
+
 #Binary and JSON serialization.
 serde = { version = "1.0.104", features = ["derive"] }
 bincode = "1.2.1"
