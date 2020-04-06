@@ -10,15 +10,8 @@ pub trait Named {
     fn get_name(&self) -> &str;
 }
 
-pub trait PinInputtable {
-    fn get_inputs(&self, catalogue: &Catalogue) -> std::vec::Vec<Pin>;
-}
-
-pub trait PinOutputtable {
-    fn get_outputs(&self, catalogue: &Catalogue) -> std::vec::Vec<Pin>;
-}
-
-pub trait NodeProcess {
+pub trait Nodeable {
+    fn get_io(&self, catalogue: &Catalogue) -> (std::vec::Vec<Pin>, std::vec::Vec<Pin>);
     fn compute_outputs(&self, node: &mut Node, catalogue: &mut Catalogue) -> Result<(), String>;
 }
 
@@ -43,7 +36,6 @@ impl Named for Pin {
 
 pub struct Node {
     pub info: NodeInfo,
-    pub uuid: uuid::Uuid,
     pub inputs: std::vec::Vec<Pin>,
     pub outputs: std::vec::Vec<Pin>,
     pub process: Box<Dynamic>,

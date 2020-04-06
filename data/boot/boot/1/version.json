@@ -1,0 +1,32 @@
+{
+    "format": 1,
+    "inputs": [
+        {
+            "name": "Graph Path",
+            "uuid": "ce791349-954f-425b-8a30-f4ab0238510b",
+            "datatype": "string"
+        },
+        {
+            "name": "Graph Version",
+            "uuid": "cdb1d8eb-ea4e-4af4-b4e6-8ed8ace4ef7e",
+            "datatype": "u64"
+        }
+    ],
+    "outputs": [
+    ],
+    "nodes": [
+        {
+            "uuid": "47fd8ff8-ab0e-4cfd-963f-a375164ec3de",
+            "x": 0.0,
+            "y": 0.0,
+            "graph": {
+                "name": "Graph Canvas",
+                "uuid": "8d1696d6-c9b7-4b27-8740-b44877f6bb19",
+                "library": "internal",
+                "version": 1
+            }
+        }
+    ],
+    "connections": [
+    ]
+}

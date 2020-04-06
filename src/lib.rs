@@ -6,6 +6,8 @@ pub mod node;
 
 pub mod nodes;
 
+pub mod engine;
+
 use graph::*;
 use library::*;
 use catalogue::*;

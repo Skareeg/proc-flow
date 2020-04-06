@@ -9,6 +9,7 @@ pub struct PinInfo {
     pub uuid: uuid::Uuid,
     pub datatype: String,
     pub dimensions: Option<u16>,
+    pub expandable: Option<bool>,
 }
 
 ///
@@ -40,6 +41,8 @@ pub struct NodeInfo {
 pub struct PinRef {
     pub node: uuid::Uuid,
     pub pin: uuid::Uuid,
+    pub index: Option<u16>,
+    pub value: Option<String>,
 }
 
 ///
@@ -47,8 +50,10 @@ pub struct PinRef {
 /// 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ConnectionInfo {
-    pub output: PinRef,
-    pub input: PinRef,
+    pub receives: Option<PinRef>,
+    pub sends: Option<PinRef>,
+    pub output: Option<PinRef>,
+    pub input: Option<PinRef>,
 }
 
 ///
@@ -57,6 +62,8 @@ pub struct ConnectionInfo {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct VersionInfo {
     pub format: u16,
+    pub receives: Vec<PinInfo>,
+    pub sends: Vec<PinInfo>,
     pub inputs: Vec<PinInfo>,
     pub outputs: Vec<PinInfo>,
     pub nodes: Vec<NodeInfo>,
