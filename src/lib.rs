@@ -1,16 +1,17 @@
-mod library;
+pub mod graph;
+pub mod library;
+pub mod catalogue;
 
+pub mod node;
+
+pub mod nodes;
+
+use graph::*;
 use library::*;
+use catalogue::*;
+
 use log::*;
 
-pub fn test() {
-    println!("test");
-    let mut libs = Vec::new();
-    match get_libraries(&mut libs) {
-        Err(e) => error!("could not get libraries: {}", e),
-        _ => {}
-    }
-    for lib in libs {
-        info!("library found and loaded: {}", lib.info.name);
-    }
-}
+use dirs::document_dir;
+
+use std::path::*;
