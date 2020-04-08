@@ -5,10 +5,17 @@ use serde::{Deserialize, Serialize};
 /// 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PinInfo {
+    /// The name of this pin.
     pub name: String,
+    /// The id of this pin in regards to the graph.
     pub uuid: uuid::Uuid,
+    /// The pin's datatype.
     pub datatype: String,
+    /// Whether or not the user can type a constant directly into this input.
+    pub valuable: bool,
+    /// If it exists and is greater than 1, how many dimensions the matrix is.
     pub dimensions: Option<u16>,
+    /// Whether or not this pin is expandable, meaning many pins represent this one input as an array.
     pub expandable: Option<bool>,
 }
 
@@ -28,9 +35,13 @@ pub struct GraphRef {
 /// 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NodeInfo {
+    /// The id of this individual instance of the node.
     pub uuid: uuid::Uuid,
+    /// The horizontal position of this instance in the graph.
     pub x: f32,
+    /// The vertical position of this instance in the graph.
     pub y: f32,
+    /// The reference to the graph that this node instance represents.
     pub graph: GraphRef,
 }
 
@@ -39,10 +50,19 @@ pub struct NodeInfo {
 /// 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PinRef {
+    /// The node this pin references.
     pub node: uuid::Uuid,
-    pub pin: uuid::Uuid,
+    /// The pin this reference targets.
+    pub pin: Option<uuid::Uuid>,
+    /// An index into an which pin of an expandable pin.
     pub index: Option<u16>,
-    pub value: Option<String>,
+    /// A built-in property of the node this reference targets.
+    pub property: Option<String>,
+    /// Whether or not this particular output has been designated in the graph to cache its value.
+    /// This defaults to true for both inputs and outputs.
+    pub cache: Option<bool>,
+    /// A direct value input from the user.
+    pub value: Option<serde_json::Value>,
 }
 
 ///

@@ -4,20 +4,25 @@ use dynamic::*;
 use crate::graph::*;
 use crate::catalogue::*;
 
+use axiom::prelude::*;
+
 #[derive(Default)]
-pub struct NodeMathBasicAddU8V1 {
-    pub result: u8,
+pub struct NodeUtilLogV1 {
 }
 
-impl Nodeable for NodeMathBasicAddU8V1 {
+impl Nodeable for NodeUtilLogV1 {
     fn get_io(&self, catalogue: &Catalogue) -> (std::vec::Vec<Pin>, std::vec::Vec<Pin>) {
+        (Vec::new(), Vec::new())
+    }
+
+    fn get_rs(&self, catalogue: &Catalogue) -> (std::vec::Vec<Pin>, std::vec::Vec<Pin>) {
         let mut pins_in = Vec::new();
         let mut pins_out = Vec::new();
         pins_in.push(Pin {
             info: PinInfo {
                 uuid: uuid::Uuid::new_v4(),
-                name: "Numbers".to_owned(),
-                datatype: "u8".to_owned(),
+                name: String::from("Info"),
+                datatype: String::from("string"),
                 dimensions: None,
                 expandable: Some(true),
             },
@@ -29,26 +34,26 @@ impl Nodeable for NodeMathBasicAddU8V1 {
         pins_in.push(Pin {
             info: PinInfo {
                 uuid: uuid::Uuid::new_v4(),
-                name: "B".to_owned(),
-                datatype: "u8".to_owned(),
+                name: String::from("Warn"),
+                datatype: String::from("string"),
                 dimensions: None,
-                expandable: None,
+                expandable: Some(true),
             },
             uuid: uuid::Uuid::new_v4(),
             pin_type: PinType::Input,
             links: Vec::new(),
             value: Default::default(),
         });
-        pins_out.push(Pin {
+        pins_in.push(Pin {
             info: PinInfo {
                 uuid: uuid::Uuid::new_v4(),
-                name: "Result".to_owned(),
-                datatype: "u16".to_owned(),
+                name: String::from("Error"),
+                datatype: String::from("string"),
                 dimensions: None,
-                expandable: None,
+                expandable: Some(true),
             },
             uuid: uuid::Uuid::new_v4(),
-            pin_type: PinType::Output,
+            pin_type: PinType::Input,
             links: Vec::new(),
             value: Default::default(),
         });
@@ -58,12 +63,14 @@ impl Nodeable for NodeMathBasicAddU8V1 {
     fn compute_outputs(&self, node: &mut Node, catalogue: &mut Catalogue) -> Result<(), String> {
         Ok(())
     }
+    
+    fn handle_receives(&self, node: &mut Node, catalogue: &mut Catalogue, context: Context, message: Message) {
+    }
 }
 
-impl NodeMathBasicAddU8V1 {
+impl NodeUtilLogV1 {
     pub fn new(catalogue: &Catalogue, x: f32, y: f32) -> Node {
-        let node = NodeMathBasicAddU8V1 {
-            result: 0,
+        let node = NodeUtilLogV1 {
         };
         let (inputs, outputs) = node.get_io(catalogue);
         Node {

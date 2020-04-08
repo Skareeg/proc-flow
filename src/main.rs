@@ -8,7 +8,15 @@ extern crate simplelog;
 use simplelog::*;
 use axiom::prelude::*;
 
+use serde_json;
+use serde::{Deserialize, Serialize};
+
 #[macro_use] extern crate conrod_core;
+
+#[derive(Serialize, Deserialize, Clone)]
+struct Test {
+    pub msg: Option<serde_json::Value>,
+}
 
 fn main() {
     CombinedLogger::init(
