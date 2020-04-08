@@ -1,8 +1,8 @@
 use crate::node::*;
 use dynamic::*;
 
-use crate::graph::*;
 use crate::catalogue::*;
+use crate::graph::*;
 
 use axiom::prelude::*;
 

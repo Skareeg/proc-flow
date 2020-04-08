@@ -1,9 +1,9 @@
-use serde::{Serialize, Deserialize};
-use serde::de::DeserializeOwned;
+use crate::catalogue::*;
+use crate::graph::*;
 use axiom::prelude::*;
 use dynamic::*;
-use crate::graph::*;
-use crate::catalogue::*;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 
 extern crate crossbeam;
 
@@ -13,7 +13,7 @@ pub trait Named {
 
 ///
 /// Implements a struct that acts as a node process.
-/// 
+///
 pub trait Nodeable {
     /// Gets the default input/output pins for this node.
     fn get_io(&self, catalogue: &Catalogue) -> (std::vec::Vec<Pin>, std::vec::Vec<Pin>);
@@ -21,14 +21,27 @@ pub trait Nodeable {
     fn get_rs(&self, catalogue: &Catalogue) -> (std::vec::Vec<Pin>, std::vec::Vec<Pin>);
     /// Computes one of the outputs for a pin.
     /// This may have different behavior for each node, as some may calculate all of their outputs at once, and others may only calculate what they need.
-    fn compute_output(&self, node: &Node, catalogue: std::sync::Arc<Catalogue>, output: PinInfo) -> Result<Message, String>;
+    fn compute_output(
+        &self,
+        node: &Node,
+        catalogue: std::sync::Arc<Catalogue>,
+        output: PinInfo,
+    ) -> Result<Message, String>;
     /// Reacts to an incoming command from another node.
-    fn handle_receive(&self, node: &mut Node, catalogue: std::sync::Arc<Catalogue>, sender: &PinRef, receiver: &PinRef, context: Context, message: &Message);
+    fn handle_receive(
+        &self,
+        node: &mut Node,
+        catalogue: std::sync::Arc<Catalogue>,
+        sender: &PinRef,
+        receiver: &PinRef,
+        context: Context,
+        message: &Message,
+    );
 }
 
 ///
 /// Represents an instance of an individual pin in memory.
-/// 
+///
 pub struct Pin {
     /// The general pin information in regards to the graph it comes from.
     pub info: PinInfo,
@@ -43,14 +56,14 @@ impl Named for Pin {
     fn get_name(&self) -> String {
         match self.index {
             0 => self.info.name.clone(),
-            _ => format!("{}[{}]", self.info.name.clone(), self.index)
+            _ => format!("{}[{}]", self.info.name.clone(), self.index),
         }
     }
 }
 
 ///
 /// General node container.
-/// 
+///
 pub struct Node {
     /// The instance data for this node, pulled from the library.
     pub info: NodeInfo,
@@ -110,11 +123,11 @@ use log::*;
 
 ///
 /// Implementation for a node.
-/// 
+///
 impl Node {
     ///
     /// Handle messages sent by other actors.
-    /// 
+    ///
     pub async fn handle(mut self, context: Context, message: Message) -> ActorResult<Self> {
         if let Some(msg) = message.content_as::<NodeCommand>() {
             match &*msg {
@@ -133,9 +146,13 @@ impl Node {
                                     // Send the value already there, effectively caching it.
                                     Some(output_value) => {
                                         // Send
-                                    },
+                                    }
                                     None => {
-                                        let new_output_value = self.process.compute_output(&self, self.catalogue.clone(), output_pin.info.clone());
+                                        let new_output_value = self.process.compute_output(
+                                            &self,
+                                            self.catalogue.clone(),
+                                            output_pin.info.clone(),
+                                        );
                                         match new_output_value {
                                             Ok(new_output_value) => {
                                                 output_pin.value = Some(new_output_value);
@@ -145,16 +162,22 @@ impl Node {
                                         };
                                     }
                                 }
-                            },
+                            }
                             // Pin does not exist.
                             None => {
-                                error!("node actor {} does not have outpin pin with uuid of {}", &context.aid, requested_output_pin);
+                                error!(
+                                    "node actor {} does not have outpin pin with uuid of {}",
+                                    &context.aid, requested_output_pin
+                                );
                             }
                         }
                     }
-                },
+                }
                 NodeCommand::InputOutput(commander, output, input, datatype, message) => {
-                    let ipin: Option<&mut Pin> = self.inputs.iter_mut().find(|inp| inp.uuid == input.pin.unwrap());
+                    let ipin: Option<&mut Pin> = self
+                        .inputs
+                        .iter_mut()
+                        .find(|inp| inp.uuid == input.pin.unwrap());
                     match ipin {
                         Some(ipin) => {
                             if ipin.info.datatype.cmp(datatype) == std::cmp::Ordering::Equal {
@@ -171,18 +194,28 @@ impl Node {
                                     error!("incorrect datatype sent from actor {:?}: value {} to actor {:?}: pin {}", commander, ovalue, &context.aid, ipin.uuid);
                                 }
                             }
-                        },
-                        None => error!("node actor {:?} does not have input pin with uuid of {}", &context.aid, input.pin.unwrap())
+                        }
+                        None => error!(
+                            "node actor {:?} does not have input pin with uuid of {}",
+                            &context.aid,
+                            input.pin.unwrap()
+                        ),
                     };
-                },
+                }
                 NodeCommand::ReceiverMessage(commander, sender, receiver, message) => {
-                    self.process.handle_receive(&mut self, self.catalogue.clone(), &sender, &receiver, context, message);
-                },
-                NodeCommand::RequestProgress(requestor) => {
-                },
+                    self.process.handle_receive(
+                        &mut self,
+                        self.catalogue.clone(),
+                        &sender,
+                        &receiver,
+                        context,
+                        message,
+                    );
+                }
+                NodeCommand::RequestProgress(requestor) => {}
                 NodeCommand::UpdateProgress(progressor, progress) => {
                     self.progress = *progress;
-                },
+                }
             }
         }
         Ok(Status::done(self))

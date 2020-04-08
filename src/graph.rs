@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 ///
 /// Information about a pin.
-/// 
+///
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PinInfo {
     /// The name of this pin.
@@ -21,7 +21,7 @@ pub struct PinInfo {
 
 ///
 /// Reference to an external graph, or this one.
-/// 
+///
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GraphRef {
     pub name: String,
@@ -30,9 +30,15 @@ pub struct GraphRef {
     pub version: u64,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Datum {
+    pub name: String,
+    pub value: serde_json::Value,
+}
+
 ///
 /// Information for a given node.
-/// 
+///
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NodeInfo {
     /// The id of this individual instance of the node.
@@ -41,13 +47,16 @@ pub struct NodeInfo {
     pub x: f32,
     /// The vertical position of this instance in the graph.
     pub y: f32,
+    /// Data variables used by the node to store data that is not held on any inputs, including large array data, matrix data, and a string or many strings pointing to relative file paths or not-recommended absolute file paths of data files.
+    /// Basically just whatever the node needs to hold.
+    pub data: Option<Vec<Datum>>,
     /// The reference to the graph that this node instance represents.
     pub graph: GraphRef,
 }
 
 ///
 /// Reference to a pin within the graph.
-/// 
+///
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PinRef {
     /// The node this pin references.
@@ -67,7 +76,7 @@ pub struct PinRef {
 
 ///
 /// References to two connected pins.
-/// 
+///
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ConnectionInfo {
     pub receives: Option<PinRef>,
@@ -78,7 +87,7 @@ pub struct ConnectionInfo {
 
 ///
 /// Information about a given version of the graph.
-/// 
+///
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct VersionInfo {
     pub format: u16,
@@ -92,7 +101,7 @@ pub struct VersionInfo {
 
 ///
 /// Information about a graph as a whole, regardless of version.
-/// 
+///
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GraphInfo {
     pub name: String,
@@ -105,7 +114,11 @@ use std::path::{Path, PathBuf};
 
 use log::*;
 
-pub fn get_graph_version_from_library(lib: &Library, id: uuid::Uuid, version: u64) -> Option<VersionInfo> {
+pub fn get_graph_version_from_library(
+    lib: &Library,
+    id: uuid::Uuid,
+    version: u64,
+) -> Option<VersionInfo> {
     match lib.graphs.get(&id) {
         Some(pair) => {
             let graph_path = &pair.path;
@@ -116,26 +129,52 @@ pub fn get_graph_version_from_library(lib: &Library, id: uuid::Uuid, version: u6
                     let version_json = version_path.join(PathBuf::from("version.json"));
                     match version_json.is_file() {
                         true => match std::fs::read_to_string(&version_json) {
-                            Ok(json) => {
-                                match serde_json::from_str::<VersionInfo>(&json) {
-                                    Ok(info) => {
-                                        Some(info)
-                                    },
-                                    Err(e) => {
-                                        error!("could not read {} version json: {}", version_json.display(), e); None
-                                    }
+                            Ok(json) => match serde_json::from_str::<VersionInfo>(&json) {
+                                Ok(info) => Some(info),
+                                Err(e) => {
+                                    error!(
+                                        "could not read {} version json: {}",
+                                        version_json.display(),
+                                        e
+                                    );
+                                    None
                                 }
                             },
                             Err(e) => {
-                                error!("could not read {} version file: {}", version_json.display(), e); None
+                                error!(
+                                    "could not read {} version file: {}",
+                                    version_json.display(),
+                                    e
+                                );
+                                None
                             }
                         },
-                        false => { error!("version.json file does not exist in the {} directory", version_path.display()); None }
+                        false => {
+                            error!(
+                                "version.json file does not exist in the {} directory",
+                                version_path.display()
+                            );
+                            None
+                        }
                     }
-                },
-                false => { error!("version directory {} does not exist for {} graph with id of {}", version_path.display(), graph_info.name, graph_info.uuid); None }
+                }
+                false => {
+                    error!(
+                        "version directory {} does not exist for {} graph with id of {}",
+                        version_path.display(),
+                        graph_info.name,
+                        graph_info.uuid
+                    );
+                    None
+                }
             }
-        },
-        _ => { info!("graph with id of {} does not exist in the {} library with id of {}", id, lib.info.name, lib.info.uuid); None }
+        }
+        _ => {
+            info!(
+                "graph with id of {} does not exist in the {} library with id of {}",
+                id, lib.info.name, lib.info.uuid
+            );
+            None
+        }
     }
 }

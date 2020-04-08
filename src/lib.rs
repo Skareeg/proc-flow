@@ -1,6 +1,6 @@
+pub mod catalogue;
 pub mod graph;
 pub mod library;
-pub mod catalogue;
 
 pub mod node;
 
@@ -8,9 +8,9 @@ pub mod nodes;
 
 pub mod engine;
 
+use catalogue::*;
 use graph::*;
 use library::*;
-use catalogue::*;
 
 use log::*;
 
