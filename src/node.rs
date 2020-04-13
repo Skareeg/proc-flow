@@ -79,9 +79,9 @@ pub struct Node {
     /// How far along this node is to computing it's last request.
     /// TODO Move this into the pins and handle requests for progress by pin.
     pub progress: f32,
-    /// A copy of the local catalogue.
-    /// This might be excessive, and if so, I will revert it back later, but I would trade RAM for speed.
-    pub catalogue: Catalogue,
+    /// A pointer to an immutable catalogue.
+    /// They shouldn't mutate anyway, so this is a good trade off between the memory of mutable arcs and speed of local copies per node.
+    pub catalogue: Arc<Catalogue>,
 }
 
 impl Named for Node {
