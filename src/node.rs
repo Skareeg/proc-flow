@@ -26,14 +26,12 @@ pub trait Nodeable {
     fn compute_output(
         &self,
         node: &Node,
-        catalogue: Arc<Mutex<Catalogue>>,
         output_info: PinInfo,
     ) -> Result<Message, String>;
     /// Reacts to an incoming command from another node.
     fn handle_receive(
         &mut self,
         node: &mut Node,
-        catalogue: Arc<Mutex<Catalogue>>,
         sender: &PinRef,
         receiver: &PinRef,
         context: Context,
@@ -81,11 +79,9 @@ pub struct Node {
     /// How far along this node is to computing it's last request.
     /// TODO Move this into the pins and handle requests for progress by pin.
     pub progress: f32,
-    /// A pointer to the local catalogue.
-    /// In a normal actor system this would be its own actor and we would just request it is needed, however that would have far too much latency.
-    /// With that in mind, it is going into a local shared thread memory location.
-    /// TODO Instead of a catalogue, just have the functions to load node information from a file and lazy load as needed.
-    pub catalogue: Arc<Mutex<Catalogue>>,
+    /// A copy of the local catalogue.
+    /// This might be excessive, and if so, I will revert it back later, but I would trade RAM for speed.
+    pub catalogue: Catalogue,
 }
 
 impl Named for Node {
@@ -185,10 +181,8 @@ impl Node {
                                             }
                                             None => {
                                                 let process = self.process.clone();
-                                                let catalogue = self.catalogue.clone();
                                                 let new_output_value = process.lock().unwrap().compute_output(
                                                     &self,
-                                                    catalogue,
                                                     output_info.clone(),
                                                 );
                                                 match new_output_value {
@@ -240,10 +234,8 @@ impl Node {
                                             }
                                             None => {
                                                 let process = self.process.clone();
-                                                let catalogue = self.catalogue.clone();
                                                 let new_output_value = process.lock().unwrap().compute_output(
                                                     &self,
-                                                    catalogue,
                                                     output_info.clone(),
                                                 );
                                                 match new_output_value {
@@ -296,11 +288,9 @@ impl Node {
                     };
                 }
                 NodeCommand::ReceiverMessage(commander, sender, receiver, message) => {
-                    let catalogue = self.catalogue.clone();
                     let process = self.process.clone();
                     process.lock().unwrap().handle_receive(
                         &mut self,
-                        catalogue,
                         &sender,
                         &receiver,
                         context,
