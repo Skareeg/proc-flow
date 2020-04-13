@@ -6,6 +6,9 @@ use crate::graph::*;
 
 use axiom::prelude::*;
 
+use std::sync::*;
+
 pub struct Engine {
     pub system: ActorSystem,
+    pub catalogue: Arc<Mutex<Catalogue>>,
 }
