@@ -47,9 +47,16 @@ pub struct Pin {
     pub info: PinInfo,
     /// The information about this pin instance.
     pub instance: PinRef,
+    /// The id of this specific pin instance.
     pub uuid: uuid::Uuid,
-    pub links: Vec<PinRef>,
+    /// The links to other pins.
+    pub link_pins: std::collections::HashMap<uuid::Uuid, PinRef>,
+    /// The links to other pins.
+    pub link_progress: std::collections::HashMap<uuid::Uuid, f32>,
+    /// The current value, used for caching.
     pub value: Option<Message>,
+    /// The progress until this pin is done computing.
+    pub progress: f32,
 }
 
 impl Named for Pin {
@@ -68,20 +75,16 @@ pub struct Node {
     /// The instance data for this node, pulled from the library.
     pub info: NodeInfo,
     /// The actual input and receive pins to this node.
-    pub inputs: std::collections::HashMap<(uuid::Uuid, u16), Pin>,
+    pub inputs: std::collections::HashMap<uuid::Uuid, Pin>,
     /// The actual output and send pins from this node.
-    pub outputs: std::collections::HashMap<(uuid::Uuid, u16), Pin>,
+    pub outputs: std::collections::HashMap<uuid::Uuid, Pin>,
     /// The implementation of this particular node instance.
     /// Arc as a threadsafe container.
     /// Mutex to mutate it,
     /// Box to hold it in memory.
     pub process: Arc<Mutex<Box<dyn Nodeable>>>,
-    /// How far along this node is to computing it's last request.
-    /// TODO Move this into the pins and handle requests for progress by pin.
-    pub progress: f32,
-    /// A pointer to an immutable catalogue.
-    /// They shouldn't mutate anyway, so this is a good trade off between the memory of mutable arcs and speed of local copies per node.
-    pub catalogue: Arc<Catalogue>,
+    /// A pointer to an mutable catalogue.
+    pub catalogue: Arc<Mutex<Catalogue>>,
 }
 
 impl Named for Node {
@@ -113,11 +116,16 @@ pub enum NodeCommand {
     /// The dynamic is the message.
     ReceiverMessage(Aid, PinRef, PinRef, Message),
     /// Requests the progress of a node.
+    /// These are primarily sent by external actors, or the graph editor actor.
     /// Aid is the requestor.
-    RequestProgress(Aid),
+    /// Pin is the output whose progress is updating.
+    RequestProgress(Aid, PinRef),
     /// Provides the progress of a given node.
-    /// Aid is the progressing node, and f32 is the progress.
-    UpdateProgress(Aid, f32),
+    /// These are sent automatically during computes.
+    /// Aid is the progressing node.
+    /// Pin is the output whose progress is updating.
+    /// Float is the progress.
+    UpdateProgress(Aid, PinRef, f32),
 }
 
 use log::*;
@@ -144,114 +152,56 @@ impl Node {
                     // If this is a request for the ouput of a pin.
                     match output.pin {
                         Some(requested_output_pin) => {
-                            // If this request is for a pin by index.
-                            match output.index {
-                                Some(requested_output_index) => {
-                                    // Gather the needed information prematurely, or the borrow checker will have a field day.
-                                    let output_info: PinInfo;
-                                    let output_uuid: uuid::Uuid;
-                                    let output_value: Option<Message>;
-                                    // Reference to self, and the pin as well, must go out of scope.
-                                    {
-                                        let output_pin = self.outputs.get_mut(&(requested_output_pin, requested_output_index));
-                                        match output_pin {
-                                            // The pin exists. Get the requried information.
-                                            Some(output_pin) => {
-                                                output_info = output_pin.info.clone();
-                                                output_uuid = output_pin.uuid;
-                                                output_value = output_pin.value.clone();
-                                            },
-                                            // The pin does not exit. Return after logging an error.
-                                            None => {
-                                                error!(
-                                                    "node actor {} does not have outpin pin with uuid of {}",
-                                                    &context.aid, requested_output_pin
-                                                );
-                                                return Ok(Status::done(self));
-                                            }
-                                        }
-                                    }
-                                    // Is the datatype correct?
-                                    if &*output_info.datatype == &*datatype {
-                                        // Is there already a value?
-                                        match output_value {
-                                            // Send the value already there, effectively caching it.
-                                            Some(output_value) => {
-                                                send_input_output(&context, commander.clone(), output.clone(), input.clone(), output_info.datatype.clone(), output_value.clone());
-                                            }
-                                            None => {
-                                                let process = self.process.clone();
-                                                let new_output_value = process.lock().unwrap().compute_output(
-                                                    &self,
-                                                    output_info.clone(),
-                                                );
-                                                match new_output_value {
-                                                    Ok(new_output_value) => {
-                                                        let output_pin = self.outputs.get_mut(&(requested_output_pin, requested_output_index)).unwrap();
-                                                        output_pin.value = Some(new_output_value.clone());
-                                                        send_input_output(&context, commander.clone(), output.clone(), input.clone(), output_info.datatype.clone(), new_output_value.clone());
-                                                    },
-                                                    Err(e) => error!("could not calculate output value for node actor {:?} pin {} because of reason: {}", &context.aid, requested_output_pin, e)
-                                                };
-                                            }
-                                        }
-                                    } else {
-                                        error!("incorrect requested datatype from node actor {:?} pin {} to node actor {:?} pin {}", &context.aid, output_uuid, &commander, input.pin.unwrap());
-                                    }
-                                },
-                                None => {
-                                    // Gather the needed information prematurely, or the borrow checker will have a field day.
-                                    let output_info: PinInfo;
-                                    let output_uuid: uuid::Uuid;
-                                    let output_value: Option<Message>;
-                                    // Reference to self, and the pin as well, must go out of scope.
-                                    {
-                                        let output_pin = self.outputs.get_mut(&(requested_output_pin, 0));
-                                        match output_pin {
-                                            // The pin exists. Get the requried information.
-                                            Some(output_pin) => {
-                                                output_info = output_pin.info.clone();
-                                                output_uuid = output_pin.uuid;
-                                                output_value = output_pin.value.clone();
-                                            },
-                                            // The pin does not exit. Return after logging an error.
-                                            None => {
-                                                error!(
-                                                    "node actor {} does not have outpin pin with uuid of {}",
-                                                    &context.aid, requested_output_pin
-                                                );
-                                                return Ok(Status::done(self));
-                                            }
-                                        }
-                                    }
-                                    // Is the datatype correct?
-                                    if &*output_info.datatype == &*datatype {
-                                        // Is there already a value?
-                                        match output_value {
-                                            // Send the value already there, effectively caching it.
-                                            Some(output_value) => {
-                                                send_input_output(&context, commander.clone(), output.clone(), input.clone(), output_info.datatype.clone(), output_value.clone());
-                                            }
-                                            None => {
-                                                let process = self.process.clone();
-                                                let new_output_value = process.lock().unwrap().compute_output(
-                                                    &self,
-                                                    output_info.clone(),
-                                                );
-                                                match new_output_value {
-                                                    Ok(new_output_value) => {
-                                                        let output_pin = self.outputs.get_mut(&(requested_output_pin, 0)).unwrap();
-                                                        output_pin.value = Some(new_output_value.clone());
-                                                        send_input_output(&context, commander.clone(), output.clone(), input.clone(), output_info.datatype.clone(), new_output_value.clone());
-                                                    },
-                                                    Err(e) => error!("could not calculate output value for node actor {:?} pin {} because of reason: {}", &context.aid, requested_output_pin, e)
-                                                };
-                                            }
-                                        }
-                                    } else {
-                                        error!("incorrect requested datatype from node actor {:?} pin {} to node actor {:?} pin {}", &context.aid, output_uuid, &commander, input.pin.unwrap());
+                            // Gather the needed information prematurely, or the borrow checker will have a field day.
+                            let output_info: PinInfo;
+                            let output_uuid: uuid::Uuid;
+                            let output_value: Option<Message>;
+                            // Reference to self, and the pin as well, must go out of scope.
+                            {
+                                let output_pin = self.outputs.get_mut(&requested_output_pin);
+                                match output_pin {
+                                    // The pin exists. Get the requried information.
+                                    Some(output_pin) => {
+                                        output_info = output_pin.info.clone();
+                                        output_uuid = output_pin.uuid;
+                                        output_value = output_pin.value.clone();
+                                    },
+                                    // The pin does not exit. Return after logging an error.
+                                    None => {
+                                        error!(
+                                            "node actor {} does not have outpin pin with uuid of {}",
+                                            &context.aid, requested_output_pin
+                                        );
+                                        return Ok(Status::done(self));
                                     }
                                 }
+                            }
+                            // Is the datatype correct?
+                            if &*output_info.datatype == &*datatype {
+                                // Is there already a value?
+                                match output_value {
+                                    // Send the value already there, effectively caching it.
+                                    Some(output_value) => {
+                                        send_input_output(&context, commander.clone(), output.clone(), input.clone(), output_info.datatype.clone(), output_value.clone());
+                                    }
+                                    None => {
+                                        let process = self.process.clone();
+                                        let new_output_value = process.lock().unwrap().compute_output(
+                                            &self,
+                                            output_info.clone(),
+                                        );
+                                        match new_output_value {
+                                            Ok(new_output_value) => {
+                                                let output_pin = self.outputs.get_mut(&requested_output_pin).unwrap();
+                                                output_pin.value = Some(new_output_value.clone());
+                                                send_input_output(&context, commander.clone(), output.clone(), input.clone(), output_info.datatype.clone(), new_output_value.clone());
+                                            },
+                                            Err(e) => error!("could not calculate output value for node actor {:?} pin {} because of reason: {}", &context.aid, requested_output_pin, e)
+                                        };
+                                    }
+                                }
+                            } else {
+                                error!("incorrect requested datatype from node actor {:?} pin {} to node actor {:?} pin {}", &context.aid, output_uuid, &commander, input.pin.unwrap());
                             }
                         }
                         ,None => {
@@ -262,7 +212,7 @@ impl Node {
                 // This is a reply from a compute output request, setting the value of the input.
                 NodeCommand::InputOutput(commander, output, input, datatype, message) => {
                     let ipin: Option<&mut Pin> = self
-                        .inputs.get_mut(&(input.pin.unwrap(), 0));
+                        .inputs.get_mut(&input.pin.unwrap());
                     match ipin {
                         Some(ipin) => {
                             if &*ipin.info.datatype == &*datatype {
@@ -297,16 +247,25 @@ impl Node {
                         message,
                     );
                 }
-                NodeCommand::RequestProgress(requestor) => {
-                    match requestor.send_new(NodeCommand::UpdateProgress(context.aid.clone(), self.progress)) {
-                        Ok(()) => trace!("update progress ({}) sent from {:?} to {:?}", self.progress, &context.aid, requestor),
-                        Err(e) => error!("could not send update progress ({}) from {:?} to {:?}: {:?}", self.progress, &context.aid, requestor, e)
+                NodeCommand::RequestProgress(requestor, output) => {
+                    let progress = self.outputs.get(&output.pin.unwrap()).unwrap().progress.clone();
+                    match requestor.send_new(NodeCommand::UpdateProgress(context.aid.clone(), output.clone(), progress.clone())) {
+                        Ok(()) => trace!("update progress ({}) sent from {:?} to {:?}", progress, &context.aid, requestor),
+                        Err(e) => error!("could not send update progress ({}) from {:?} to {:?}: {:?}", progress.clone(), &context.aid, requestor, e)
                     };
                 }
-                NodeCommand::UpdateProgress(progressor, progress) => {
-                    self.progress = *progress;
-                },
-                _ => warn!("unknown node command at node actor {}", &context.aid)
+                NodeCommand::UpdateProgress(progressor, output, progress) => {
+                    self.inputs
+                        .values_mut()
+                        .for_each(|input: &mut Pin| {
+                            if let Some(output) = input.link_progress.get_mut(&output.pin.unwrap()) {
+                                *output = *progress;
+                                let total_progress: f32 = input.link_progress.values().sum();
+                                let link_count = input.link_progress.len() as f32;
+                                input.progress = total_progress / link_count;
+                            }
+                        });
+                }
             };
         }
         Ok(Status::done(self))
