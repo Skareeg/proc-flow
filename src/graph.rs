@@ -54,6 +54,7 @@ pub struct NodeInfo {
     pub graph: GraphRef,
 }
 
+
 ///
 /// Reference to a pin within the graph.
 ///
@@ -63,8 +64,6 @@ pub struct PinRef {
     pub node: uuid::Uuid,
     /// The pin this reference targets.
     pub pin: Option<uuid::Uuid>,
-    /// An index into an which pin of an expandable pin.
-    pub index: Option<u16>,
     /// A built-in property of the node this reference targets.
     pub property: Option<String>,
     /// Whether or not this particular output has been designated in the graph to cache its value.
