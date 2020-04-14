@@ -51,7 +51,9 @@ pub struct Pin {
     pub uuid: uuid::Uuid,
     /// The links to other pins.
     pub link_pins: std::collections::HashMap<uuid::Uuid, PinRef>,
-    /// The links to other pins.
+    /// The values of each of the links.
+    pub link_value: std::collections::HashMap<uuid::Uuid, Option<Message>>,
+    /// The progress of each of the links.
     pub link_progress: std::collections::HashMap<uuid::Uuid, f32>,
     /// The current value, used for caching.
     pub value: Option<Message>,
@@ -61,10 +63,7 @@ pub struct Pin {
 
 impl Named for Pin {
     fn get_name(&self) -> String {
-        match self.instance.index {
-            None => self.info.name.clone(),
-            Some(index) => format!("{}[{}]", self.info.name.clone(), index),
-        }
+        self.info.name.clone()
     }
 }
 
@@ -102,13 +101,19 @@ pub enum NodeCommand {
     /// Second id is the output pin.
     /// String is the datatype to request.
     ComputeOutput(Aid, PinRef, PinRef, String),
+    // /// Sends an output to another nodes input.
+    // /// Aid is the sending node.
+    // /// First pin is the input pin.
+    // /// Second pin is the output pin for that input.
+    // /// String is the datatype sent.
+    // /// The message is the value.
+    // InputOutputValue(Aid, PinRef, PinRef, String, Message),
     /// Sends an output to another nodes input.
     /// Aid is the sending node.
-    /// First id is the output pin.
-    /// Second id is the input pin.
+    /// Pin is the input pin.
     /// String is the datatype sent.
     /// The message is the value.
-    InputOutput(Aid, PinRef, PinRef, String, Message),
+    InputValue(Aid, PinRef, String, Message),
     /// Sends a message of some sort to a receiver.
     /// Aid is the sending node.
     /// First id is the sending pin.
@@ -131,7 +136,7 @@ pub enum NodeCommand {
 use log::*;
 
 fn send_input_output(context: &Context, commander: Aid, output: PinRef, input: PinRef, datatype: String, msg: Message) {
-    match commander.send_new(NodeCommand::InputOutput(context.aid.clone(), output.clone(), input.clone(), datatype.clone(), msg)) {
+    match commander.send_new(NodeCommand::InputValue(context.aid.clone(), input.clone(), datatype.clone(), msg)) {
         Ok(()) => trace!("sent inputoutput from node actor {:?} to node actor {:?}, pin {:?} to pin {:?} with datatype {}", context.aid.clone(), commander.clone(), output.clone(), input.clone(), datatype.clone()),
         Err(e) => error!("unable to send inputoutput from node actor {:?} to node actor {:?}, pin {:?} to pin {:?} with datatype {}", context.aid.clone(), commander.clone(), output.clone(), input.clone(), datatype.clone())
     };
@@ -210,7 +215,7 @@ impl Node {
                     // TODO: Add the reply for request of node value.
                 }
                 // This is a reply from a compute output request, setting the value of the input.
-                NodeCommand::InputOutput(commander, output, input, datatype, message) => {
+                NodeCommand::InputValue(commander, input, datatype, message) => {
                     let ipin: Option<&mut Pin> = self
                         .inputs.get_mut(&input.pin.unwrap());
                     match ipin {
@@ -218,16 +223,7 @@ impl Node {
                             if &*ipin.info.datatype == &*datatype {
                                 ipin.value = Some(message.clone());
                             } else {
-                                if let Some(opin) = output.pin {
-                                    if let Some(oindex) = output.index {
-                                        error!("incorrect datatype sent from actor {:?}: pin {}: index {} to actor {:?}: pin {}", commander, opin, oindex, &context.aid, ipin.uuid);
-                                    } else {
-                                        error!("incorrect datatype sent from actor {:?}: pin {} to actor {:?}: pin {}", commander, opin, &context.aid, ipin.uuid);
-                                    }
-                                }
-                                if let Some(oproperty) = output.property.clone() {
-                                    error!("incorrect datatype sent from actor {:?}: value {} to actor {:?}: pin {}", commander, oproperty, &context.aid, ipin.uuid);
-                                }
+                                error!("incorrect datatype sent from actor {:?} to actor {:?}: pin {}", commander, &context.aid, ipin.uuid);
                             }
                         }
                         None => error!(
