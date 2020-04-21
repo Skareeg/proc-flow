@@ -6,7 +6,9 @@ The beginnings of something heinous.
 
 ## Attention
 
-This project does not even have code behind it yet. I am building out the spec so that I have a defined initial plan. Planning is necessary.
+This project does not even have much code behind it yet. I am building out the spec so that I have a defined initial plan. Planning is necessary.
+
+Right now the project can load libraries from the internal libraries in the root workspace as well as any libraries in Your documents folder.
 
 ## Build Notes
 
