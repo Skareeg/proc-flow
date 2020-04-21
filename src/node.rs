@@ -27,6 +27,7 @@ pub trait Nodeable {
         &self,
         node: &Node,
         output_info: PinInfo,
+        context: &Context,
     ) -> Result<Message, String>;
     /// Reacts to an incoming command from another node.
     fn handle_receive(
@@ -34,7 +35,7 @@ pub trait Nodeable {
         node: &mut Node,
         sender: &PinRef,
         receiver: &PinRef,
-        context: Context,
+        context: &Context,
         message: &Message,
     );
 }
@@ -88,7 +89,12 @@ pub struct Node {
 
 impl Named for Node {
     fn get_name(&self) -> String {
-        self.info.graph.name.clone()
+        match self.info.graph.clone() {
+            Some(graph) => {
+                graph.name.clone()
+            },
+            None => format!("{}", self.info.uuid)
+        }
     }
 }
 
@@ -194,6 +200,7 @@ impl Node {
                                         let new_output_value = process.lock().unwrap().compute_output(
                                             &self,
                                             output_info.clone(),
+                                            &context
                                         );
                                         match new_output_value {
                                             Ok(new_output_value) => {
@@ -239,7 +246,7 @@ impl Node {
                         &mut self,
                         &sender,
                         &receiver,
-                        context,
+                        &context,
                         message,
                     );
                 }

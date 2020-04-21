@@ -60,22 +60,30 @@ impl Catalogue {
         }
     }
 
-    pub fn get_graph_info(&self, id: uuid::Uuid) -> Option<&GraphInfo> {
-        self.libraries
-            .values()
-            .flat_map(|lib| {
-                lib.graphs
-                    .values()
-                    .map(|pair| &pair.info)
-                    .filter(|info| info.uuid == id)
-            })
-            .next()
+    pub fn get_graph_info(&self, id: uuid::Uuid) -> Option<GraphInfo> {
+        for lib in self.libraries.values() {
+            if let Some(graph) = lib.graphs.get(&id) {
+                return Some(graph.info.clone());
+            };
+        }
+        None
+    }
+
+    pub fn get_graph_ref(&self, id: uuid::Uuid, version: u64) -> Option<GraphRef> {
+        for lib in self.libraries.values() {
+            if let Some(graph) = lib.graphs.get(&id) {
+                return Some(GraphRef {name: graph.info.name.clone(), uuid: graph.info.uuid, library: lib.info.uuid, version});
+            };
+        }
+        None
     }
 
     pub fn get_graph_version(&self, id: uuid::Uuid, version: u64) -> Option<VersionInfo> {
-        self.libraries
-            .values()
-            .filter_map(|lib| get_graph_version_from_library(&lib, id, version))
-            .next()
+        for lib in self.libraries.values() {
+            if let Some(graph) = get_graph_version_from_library(&lib, id, version) {
+                Some(graph.clone());
+            };
+        }
+        None
     }
 }

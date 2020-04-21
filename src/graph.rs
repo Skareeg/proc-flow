@@ -26,7 +26,7 @@ pub struct PinInfo {
 pub struct GraphRef {
     pub name: String,
     pub uuid: uuid::Uuid,
-    pub library: String,
+    pub library: uuid::Uuid,
     pub version: u64,
 }
 
@@ -51,7 +51,8 @@ pub struct NodeInfo {
     /// Basically just whatever the node needs to hold.
     pub data: Option<Vec<Datum>>,
     /// The reference to the graph that this node instance represents.
-    pub graph: GraphRef,
+    /// If blank, then it is the current library.
+    pub graph: Option<GraphRef>,
 }
 
 
