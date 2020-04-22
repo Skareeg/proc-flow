@@ -46,10 +46,11 @@ pub trait Nodeable {
 pub struct Pin {
     /// The general pin information in regards to the graph it comes from.
     pub info: PinInfo,
-    /// The information about this pin instance.
-    pub instance: PinRef,
     /// The id of this specific pin instance.
     pub uuid: uuid::Uuid,
+    /// Whether or not this particular output has been designated in the graph to cache its value.
+    /// This defaults to true for both inputs and outputs.
+    pub cache: Option<bool>,
     /// The links to other pins.
     pub link_pins: std::collections::HashMap<uuid::Uuid, PinRef>,
     /// The values of each of the links.
@@ -60,6 +61,9 @@ pub struct Pin {
     pub value: Option<Message>,
     /// The progress until this pin is done computing.
     pub progress: f32,
+}
+
+impl Pin {
 }
 
 impl Named for Pin {
@@ -165,8 +169,8 @@ fn pin_vec_to_hashmap(pins: Vec<Pin>) -> std::collections::HashMap<uuid::Uuid, P
 impl Node {
     pub fn new(info: NodeInfo, process: Box<dyn Nodeable>, catalogue: Arc<Mutex<Catalogue>>) -> Self {
         let cat = catalogue.lock().unwrap();
-        let (mut vinputs, mut voutputs) = process.get_io(&cat);
-        let (mut vreceives, mut vsends) = process.get_rs(&cat);
+        let (vinputs, voutputs) = process.get_io(&cat);
+        let (vreceives, vsends) = process.get_rs(&cat);
         let inputs = pin_vec_to_hashmap(vinputs);
         let outputs = pin_vec_to_hashmap(voutputs);
         let receives = pin_vec_to_hashmap(vreceives);
