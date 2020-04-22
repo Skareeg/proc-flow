@@ -81,7 +81,7 @@ impl Catalogue {
     pub fn get_graph_version(&self, id: uuid::Uuid, version: u64) -> Option<VersionInfo> {
         for lib in self.libraries.values() {
             if let Some(graph) = get_graph_version_from_library(&lib, id, version) {
-                Some(graph.clone());
+                return Some(graph.clone());
             };
         }
         None
