@@ -74,10 +74,14 @@ impl Named for Pin {
 pub struct Node {
     /// The instance data for this node, pulled from the library.
     pub info: NodeInfo,
-    /// The actual input and receive pins to this node.
+    /// The actual input pins to this node.
     pub inputs: std::collections::HashMap<uuid::Uuid, Pin>,
-    /// The actual output and send pins from this node.
+    /// The actual output pins from this node.
     pub outputs: std::collections::HashMap<uuid::Uuid, Pin>,
+    /// The actual receive pins to this node.
+    pub receives: std::collections::HashMap<uuid::Uuid, Pin>,
+    /// The actual send pins from this node.
+    pub sends: std::collections::HashMap<uuid::Uuid, Pin>,
     /// The implementation of this particular node instance.
     /// Arc as a threadsafe container.
     /// Mutex to mutate it,
@@ -89,12 +93,7 @@ pub struct Node {
 
 impl Named for Node {
     fn get_name(&self) -> String {
-        match self.info.graph.clone() {
-            Some(graph) => {
-                graph.name.clone()
-            },
-            None => format!("{}", self.info.uuid)
-        }
+        self.info.graph.name.clone()
     }
 }
 
@@ -151,10 +150,37 @@ fn send_input_output(context: &Context, commander: Aid, output: PinRef, input: P
     };
 }
 
+
+fn pin_vec_to_hashmap(pins: Vec<Pin>) -> std::collections::HashMap<uuid::Uuid, Pin> {
+    let mut map = std::collections::HashMap::new();
+    for p in pins {
+        map.insert(p.uuid, p);
+    }
+    map
+}
+
 ///
 /// Implementation for a node.
 ///
 impl Node {
+    pub fn new(info: NodeInfo, process: Box<dyn Nodeable>, catalogue: Arc<Mutex<Catalogue>>) -> Self {
+        let cat = catalogue.lock().unwrap();
+        let (mut vinputs, mut voutputs) = process.get_io(&cat);
+        let (mut vreceives, mut vsends) = process.get_rs(&cat);
+        let inputs = pin_vec_to_hashmap(vinputs);
+        let outputs = pin_vec_to_hashmap(voutputs);
+        let receives = pin_vec_to_hashmap(vreceives);
+        let sends = pin_vec_to_hashmap(vsends);
+        Self {
+            info,
+            inputs,
+            outputs,
+            receives,
+            sends,
+            process: Arc::new(Mutex::new(process)),
+            catalogue: catalogue.clone()
+        }
+    }
     ///
     /// Handle messages sent by other actors.
     ///

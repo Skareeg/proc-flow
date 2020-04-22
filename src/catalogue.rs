@@ -72,7 +72,7 @@ impl Catalogue {
     pub fn get_graph_ref(&self, id: uuid::Uuid, version: u64) -> Option<GraphRef> {
         for lib in self.libraries.values() {
             if let Some(graph) = lib.graphs.get(&id) {
-                return Some(GraphRef {name: graph.info.name.clone(), uuid: graph.info.uuid, library: lib.info.uuid, version});
+                return Some(GraphRef {name: graph.info.name.clone(), uuid: graph.info.uuid, library: Some(lib.info.uuid), version});
             };
         }
         None

@@ -21,12 +21,13 @@ pub struct PinInfo {
 
 ///
 /// Reference to an external graph, or this one.
+/// Blank library means "this" one.
 ///
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GraphRef {
     pub name: String,
     pub uuid: uuid::Uuid,
-    pub library: uuid::Uuid,
+    pub library: Option<uuid::Uuid>,
     pub version: u64,
 }
 
@@ -51,8 +52,7 @@ pub struct NodeInfo {
     /// Basically just whatever the node needs to hold.
     pub data: Option<Vec<Datum>>,
     /// The reference to the graph that this node instance represents.
-    /// If blank, then it is the current library.
-    pub graph: Option<GraphRef>,
+    pub graph: GraphRef,
 }
 
 
