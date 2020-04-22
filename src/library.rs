@@ -46,7 +46,7 @@ pub fn get_library_graphs(
                         match std::fs::read_to_string(&graphjson) {
                             Ok(json) => match serde_json::from_str::<GraphInfo>(&json) {
                                 Ok(info) => {
-                                    info!("found graph info {}: {}", entry.display(), info.name);
+                                    let name = info.name.clone();
                                     graphs.insert(
                                         info.uuid,
                                         GraphPathPair {
@@ -54,6 +54,7 @@ pub fn get_library_graphs(
                                             info: info,
                                         },
                                     );
+                                    info!("added graph info {}: {}", entry.display(), name);
                                 }
                                 Err(e) => error!("could not parse {}: {}", graphjson.display(), e),
                             },
