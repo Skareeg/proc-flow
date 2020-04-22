@@ -12,7 +12,7 @@ pub struct PinInfo {
     /// The pin's datatype.
     pub datatype: String,
     /// Whether or not the user can type a constant directly into this input.
-    pub valuable: bool,
+    pub valuable: Option<bool>,
     /// If it exists and is greater than 1, how many dimensions the matrix is.
     pub dimensions: Option<u16>,
     /// Whether or not this pin is expandable, meaning many pins represent this one input as an array.
