@@ -98,6 +98,9 @@ impl Named for Node {
     }
 }
 
+/// 
+/// Each possible command for a given node actor.
+/// 
 #[derive(Serialize, Deserialize)]
 pub enum NodeCommand {
     /// Executes a node, creating the output values.
@@ -177,7 +180,7 @@ impl Node {
                                         output_uuid = output_pin.uuid;
                                         output_value = output_pin.value.clone();
                                     },
-                                    // The pin does not exit. Return after logging an error.
+                                    // The pin does not exist. Return after logging an error.
                                     None => {
                                         error!(
                                             "node actor {} does not have outpin pin with uuid of {}",
@@ -190,6 +193,7 @@ impl Node {
                             // Is the datatype correct?
                             if &*output_info.datatype == &*datatype {
                                 // Is there already a value?
+                                // TODO: Make this a setting on node pins.
                                 match output_value {
                                     // Send the value already there, effectively caching it.
                                     Some(output_value) => {
