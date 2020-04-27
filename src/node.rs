@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 
 use std::sync::*;
 
+use std::collections::HashMap;
+
 extern crate crossbeam;
 
 pub trait Named {
@@ -24,11 +26,11 @@ pub trait Nodeable {
     /// Computes one of the outputs for a pin.
     /// This may have different behavior for each node, as some may calculate all of their outputs at once, and others may only calculate what they need.
     fn compute_output(
-        &self,
-        node: &Node,
+        &mut self,
+        node: &mut Node,
         output_info: PinInfo,
         context: &Context,
-    ) -> Result<Message, String>;
+    ) -> Result<Option<Message>, String>;
     /// Reacts to an incoming command from another node.
     fn handle_receive(
         &mut self,
@@ -50,7 +52,9 @@ pub struct Pin {
     pub uuid: uuid::Uuid,
     /// Whether or not this particular output has been designated in the graph to cache its value.
     /// This defaults to true for both inputs and outputs.
-    pub cache: Option<bool>,
+    pub cache: bool,
+    /// The links to other node actors for each link to a pin.
+    pub link_nodes: std::collections::HashMap<uuid::Uuid, Aid>,
     /// The links to other pins.
     pub link_pins: std::collections::HashMap<uuid::Uuid, PinRef>,
     /// The values of each of the links.
@@ -64,6 +68,32 @@ pub struct Pin {
 }
 
 impl Pin {
+    pub fn new_io_basic(info: PinInfo) -> Self {
+        Self {
+            info,
+            uuid: uuid::Uuid::new_v4(),
+            cache: true,
+            link_nodes: HashMap::new(),
+            link_pins: HashMap::new(),
+            link_value: HashMap::new(),
+            link_progress: HashMap::new(),
+            value: None,
+            progress: 0.0
+        }
+    }
+    pub fn new_rs_basic(info: PinInfo) -> Self {
+        Self {
+            info,
+            uuid: uuid::Uuid::new_v4(),
+            cache: false,
+            link_nodes: HashMap::new(),
+            link_pins: HashMap::new(),
+            link_value: HashMap::new(),
+            link_progress: HashMap::new(),
+            value: None,
+            progress: 0.0
+        }
+    }
 }
 
 impl Named for Pin {
@@ -232,15 +262,15 @@ impl Node {
                                     None => {
                                         let process = self.process.clone();
                                         let new_output_value = process.lock().unwrap().compute_output(
-                                            &self,
+                                            &mut self,
                                             output_info.clone(),
                                             &context
                                         );
                                         match new_output_value {
                                             Ok(new_output_value) => {
                                                 let output_pin = self.outputs.get_mut(&requested_output_pin).unwrap();
-                                                output_pin.value = Some(new_output_value.clone());
-                                                send_input_output(&context, commander.clone(), output.clone(), input.clone(), output_info.datatype.clone(), new_output_value.clone());
+                                                output_pin.value = new_output_value.clone();
+                                                send_input_output(&context, commander.clone(), output.clone(), input.clone(), output_info.datatype.clone(), Message::new(new_output_value.clone()));
                                             },
                                             Err(e) => error!("could not calculate output value for node actor {:?} pin {} because of reason: {}", &context.aid, requested_output_pin, e)
                                         };
@@ -262,7 +292,7 @@ impl Node {
                     match ipin {
                         Some(ipin) => {
                             if &*ipin.info.datatype == &*datatype {
-                                ipin.value = Some(message.clone());
+                                ipin.value = (*message.content_as::<Option<Message>>().expect("input to node was not an optional message arc")).clone();
                             } else {
                                 error!("incorrect datatype sent from actor {:?} to actor {:?}: pin {}", commander, &context.aid, ipin.uuid);
                             }
