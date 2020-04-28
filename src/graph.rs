@@ -19,6 +19,29 @@ pub struct PinInfo {
     pub expandable: Option<bool>,
 }
 
+impl PinInfo {
+    pub fn new_basic(name: String, uuid: uuid::Uuid, datatype: String) -> Self {
+        Self {
+            name,
+            uuid,
+            datatype,
+            valuable: None,
+            dimensions: None,
+            expandable: None
+        }
+    }
+    pub fn new_extended(name: String, uuid: uuid::Uuid, datatype: String, valuable: Option<bool>, dimensions: Option<u16>, expandable: Option<bool>) -> Self {
+        Self {
+            name,
+            uuid,
+            datatype,
+            valuable,
+            dimensions,
+            expandable
+        }
+    }
+}
+
 ///
 /// Reference to an external graph, or this one.
 /// Blank library means "this" one.
