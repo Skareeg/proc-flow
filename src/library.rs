@@ -20,8 +20,9 @@ pub struct LibraryInfo {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct GraphPathPair {
+pub struct LibraryGraphInfo {
     pub info: GraphInfo,
+    pub versions: u64,
     pub path: PathBuf,
 }
 
@@ -29,12 +30,12 @@ pub struct GraphPathPair {
 pub struct Library {
     pub info: LibraryInfo,
     pub path: PathBuf,
-    pub graphs: std::collections::HashMap<uuid::Uuid, GraphPathPair>,
+    pub graphs: std::collections::HashMap<uuid::Uuid, LibraryGraphInfo>,
 }
 
 pub fn get_library_graphs(
     library_path: PathBuf,
-) -> std::collections::HashMap<uuid::Uuid, GraphPathPair> {
+) -> std::collections::HashMap<uuid::Uuid, LibraryGraphInfo> {
     let mut graphs = std::collections::HashMap::new();
     for entry in walkdir::WalkDir::new(&library_path) {
         match entry {
@@ -47,14 +48,28 @@ pub fn get_library_graphs(
                             Ok(json) => match serde_json::from_str::<GraphInfo>(&json) {
                                 Ok(info) => {
                                     let name = info.name.clone();
+                                    let mut versions: u64 = 0;
+                                    for version_entry in walkdir::WalkDir::new(&entry).min_depth(1).max_depth(1) {
+                                        if let Ok(version_entry) = version_entry {
+                                            if version_entry.path().is_dir() {
+                                                let vestr = version_entry.file_name().to_str();
+                                                if let Some(vestr) = vestr {
+                                                    if String::from(vestr).trim().parse::<u64>().is_ok() {
+                                                        versions += 1;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                     graphs.insert(
                                         info.uuid,
-                                        GraphPathPair {
+                                        LibraryGraphInfo {
                                             path: entry.to_path_buf(),
                                             info: info,
+                                            versions: versions.clone()
                                         },
                                     );
-                                    info!("added graph info {}: {}", entry.display(), name);
+                                    info!("added graph info {}: {} with {} versions", entry.display(), name, versions);
                                 }
                                 Err(e) => error!("could not parse {}: {}", graphjson.display(), e),
                             },
