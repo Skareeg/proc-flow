@@ -1,5 +1,6 @@
 use crate::node::*;
 use dynamic::*;
+use axiom::actors::*;
 
 use crate::graph::*;
 use crate::catalogue::*;
@@ -9,53 +10,37 @@ pub struct NodeMetaGraph {
     pub graph: Option<GraphRef>,
 }
 
+use log::*;
+
 impl Nodeable for NodeMetaGraph {
-    fn get_io(&self, catalogue: &Catalogue) -> (std::vec::Vec<Pin>, std::vec::Vec<Pin>) {
-        let mut pins_in = Vec::new();
-        let mut pins_out = Vec::new();
-        pins_in.push(Pin {
-            info: PinInfo {
-                uuid: uuid::Uuid::new_v4(),
-                name: "A".to_owned(),
-                datatype: "u8".to_owned(),
-                dimensions: None,
-                expandable: None,
+    fn get_io(&self, catalogue: &Catalogue) -> (Vec<Pin>, Vec<Pin>) {
+        let mut ins = Vec::new();
+        let mut outs = Vec::new();
+        match self.graph.clone() {
+            Some(graph) => {
+                trace!("retrieving IO for graph {:?}", graph);
             },
-            uuid: uuid::Uuid::new_v4(),
-            pin_type: PinType::Input,
-            links: Vec::new(),
-            value: Default::default(),
-        });
-        pins_in.push(Pin {
-            info: PinInfo {
-                uuid: uuid::Uuid::new_v4(),
-                name: "B".to_owned(),
-                datatype: "u8".to_owned(),
-                dimensions: None,
-                expandable: None,
-            },
-            uuid: uuid::Uuid::new_v4(),
-            pin_type: PinType::Input,
-            links: Vec::new(),
-            value: Default::default(),
-        });
-        pins_out.push(Pin {
-            info: PinInfo {
-                uuid: uuid::Uuid::new_v4(),
-                name: "Result".to_owned(),
-                datatype: "u16".to_owned(),
-                dimensions: None,
-                expandable: None,
-            },
-            uuid: uuid::Uuid::new_v4(),
-            pin_type: PinType::Output,
-            links: Vec::new(),
-            value: Default::default(),
-        });
-        (pins_in, pins_out)
+            None => error!("no graph when retrieving IO")
+        }
+        (ins, outs)
     }
-    
-    fn compute_outputs(&self, node: &mut Node, catalogue: &mut Catalogue) -> Result<(), String> {
-        Ok(())
+    fn get_rs(&self, catalogue: &Catalogue) -> (Vec<Pin>, Vec<Pin>) {
+        let mut recvs = Vec::new();
+        let mut sends = Vec::new();
+        (recvs, sends)
     }
+    fn compute_output(
+        &mut self,
+        node: &mut Node,
+        output_info: PinInfo,
+        context: &Context,
+    ) -> Result<Option<axiom::message::Message>, String> { todo!() }
+    fn handle_receive(
+        &mut self,
+        node: &mut Node,
+        sender: &PinRef,
+        receiver: &PinRef,
+        context: &Context,
+        message: &axiom::message::Message,
+    ) { todo!() }
 }
