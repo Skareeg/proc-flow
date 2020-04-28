@@ -170,7 +170,7 @@ impl NodeUtilLogV1 {
                 graph: GraphRef {
                     name: String::from("Log"),
                     uuid: uuid::Uuid::parse_str("fd41d8ef-d10f-4499-8a90-35b73d8ff246").unwrap(),
-                    library: None,
+                    library: uuid::Uuid::parse_str("b0fa443c-20d0-4c2a-acf9-76c63af3cbed").ok(),
                     version: 1,
                 }
             },
@@ -178,4 +178,30 @@ impl NodeUtilLogV1 {
             catalogue.clone()
         )
     }
+}
+
+/// Registers the internal nodes as available graphs to a catalogue.
+/// Returns the graphs basic information and the number of versions it has.
+pub fn register() -> (GraphInfo, u64) {
+    (
+        GraphInfo {
+            name: String::from("Log"),
+            uuid: uuid::Uuid::parse_str("fd41d8ef-d10f-4499-8a90-35b73d8ff246").unwrap(),
+            format: 1,
+        },
+        1
+    )
+}
+
+use crate::node::*;
+
+/// Gives back a new internal node object from a given UUID, if it exists.
+pub fn create(catalogue: Arc<Mutex<Catalogue>>, x: f32, y: f32, uuid: uuid::Uuid, version: u64) -> Option<Node> {
+    if uuid == uuid::Uuid::parse_str("fd41d8ef-d10f-4499-8a90-35b73d8ff246").unwrap() {
+        return match version {
+            1 => Some(NodeUtilLogV1::new(catalogue, x, y)),
+            _ => None
+        };
+    }
+    None
 }
