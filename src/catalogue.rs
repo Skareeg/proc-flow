@@ -11,10 +11,29 @@ use uuid::*;
 
 use super::graph::*;
 use super::library::*;
+use super::node::*;
 
 fn load_libraries() -> Vec<Library> {
     println!("test");
-    let applibs = match std::env::current_dir() {
+    let mut libs = Vec::new();
+    let mut internal = Library {
+        info: LibraryInfo {
+            name: String::from("internal"),
+            uuid: uuid::Uuid::parse_str("b0fa443c-20d0-4c2a-acf9-76c63af3cbed").unwrap(),
+            author: String::from("Proc Flow Internal"),
+            format: 1
+        },
+        path: PathBuf::default(),
+        graphs: std::collections::HashMap::new(),
+    };
+    for (info, versions) in super::nodes::register() {
+        internal.graphs.insert(info.uuid.clone(), LibraryGraphInfo {
+            info,
+            path: PathBuf::default(),
+            versions
+        });
+    }
+    let mut applibs = match std::env::current_dir() {
         Ok(cdir) => get_libraries(cdir.join(PathBuf::from("data"))),
         Err(e) => {
             error!(
@@ -24,7 +43,7 @@ fn load_libraries() -> Vec<Library> {
             Vec::new()
         }
     };
-    let doclibs = match document_dir() {
+    let mut doclibs = match document_dir() {
         Some(ddir) => {
             get_libraries(ddir.join(PathBuf::from("ProcFlow").join(PathBuf::from("Libraries"))))
         }
@@ -34,10 +53,9 @@ fn load_libraries() -> Vec<Library> {
         }
     };
 
-    let libs = applibs
-        .into_iter()
-        .chain(doclibs.into_iter())
-        .collect::<Vec<_>>();
+    libs.push(internal);
+    libs.append(&mut applibs);
+    libs.append(&mut doclibs);
     libs
 }
 
