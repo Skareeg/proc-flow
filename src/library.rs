@@ -73,7 +73,7 @@ pub fn get_library_graphs(
                     }
                 }
             }
-            Err(e) => error!(
+            Err(e) => warn!(
                 "could not walk directory: {}: {}",
                 library_path.display(),
                 e
@@ -92,7 +92,7 @@ pub fn get_libraries(libraries_path: PathBuf) -> Vec<Library> {
                 let entry = entry.path();
                 if entry.is_dir() {
                     let libjson = entry.to_path_buf().join(Path::new("lib.json"));
-                    info!("walking {}", entry.display());
+                    trace!("walking {}", entry.display());
                     if libjson.is_file() {
                         match std::fs::read_to_string(&libjson) {
                             Ok(json) => match serde_json::from_str::<LibraryInfo>(&json) {
@@ -111,7 +111,7 @@ pub fn get_libraries(libraries_path: PathBuf) -> Vec<Library> {
                     }
                 }
             }
-            Err(e) => error!(
+            Err(e) => warn!(
                 "could not walk directory: {}: {}",
                 libraries_path.display(),
                 e
