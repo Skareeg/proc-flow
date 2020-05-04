@@ -1,5 +1,4 @@
 use crate::node::*;
-use dynamic::*;
 use axiom::actors::*;
 
 use crate::graph::*;
@@ -25,9 +24,9 @@ use log::*;
 use axiom::prelude::*;
 
 impl Nodeable for NodeMetaGraph {
-    fn get_io(&self, catalogue: &Catalogue) -> (Vec<Pin>, Vec<Pin>) {
-        let mut ins = Vec::new();
-        let mut outs = Vec::new();
+    fn get_io(&self, _catalogue: &Catalogue) -> (Vec<Pin>, Vec<Pin>) {
+        let ins = Vec::new();
+        let outs = Vec::new();
         match self.graph.clone() {
             Some(graph) => {
                 trace!("retrieving IO for graph {:?}", graph);
@@ -36,24 +35,24 @@ impl Nodeable for NodeMetaGraph {
         }
         (ins, outs)
     }
-    fn get_rs(&self, catalogue: &Catalogue) -> (Vec<Pin>, Vec<Pin>) {
-        let mut recvs = Vec::new();
-        let mut sends = Vec::new();
+    fn get_rs(&self, _catalogue: &Catalogue) -> (Vec<Pin>, Vec<Pin>) {
+        let recvs = Vec::new();
+        let sends = Vec::new();
         (recvs, sends)
     }
     fn compute_output(
         &mut self,
-        node: &mut Node,
-        output_info: PinInfo,
-        context: &Context,
-        parameter: &Option<Message>,
+        _node: &mut Node,
+        _output_info: PinInfo,
+        _context: &Context,
+        _parameter: &Option<Message>,
     ) -> Result<Option<Message>, String> { todo!() }
     fn handle_receive(
         &mut self,
-        node: &mut Node,
-        sender: &PinRef,
-        receiver: &PinRef,
-        context: &Context,
-        message: &axiom::message::Message,
+        _node: &mut Node,
+        _sender: &PinRef,
+        _receiver: &PinRef,
+        _context: &Context,
+        _message: &axiom::message::Message,
     ) { todo!() }
 }

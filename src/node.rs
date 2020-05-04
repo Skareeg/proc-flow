@@ -1,8 +1,6 @@
 use crate::catalogue::*;
 use crate::graph::*;
 use axiom::prelude::*;
-use dynamic::*;
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use std::sync::*;
@@ -206,7 +204,7 @@ use log::*;
 fn send_input_output(context: &Context, commander: Aid, output: PinRef, input: PinRef, datatype: String, msg: Message) {
     match commander.send_new(NodeCommand::InputValue(context.aid.clone(), input.clone(), datatype.clone(), msg)) {
         Ok(()) => trace!("sent inputoutput from node actor {:?} to node actor {:?}, pin {:?} to pin {:?} with datatype {}", context.aid.clone(), commander.clone(), output.clone(), input.clone(), datatype.clone()),
-        Err(e) => error!("unable to send inputoutput from node actor {:?} to node actor {:?}, pin {:?} to pin {:?} with datatype {}", context.aid.clone(), commander.clone(), output.clone(), input.clone(), datatype.clone())
+        Err(e) => error!("unable to send inputoutput from node actor {:?} to node actor {:?}, pin {:?} to pin {:?} with datatype {}: {:?}", context.aid.clone(), commander.clone(), output.clone(), input.clone(), datatype.clone(), e)
     };
 }
 
@@ -332,7 +330,7 @@ impl Node {
                         ),
                     };
                 }
-                NodeCommand::ReceiverMessage(commander, sender, receiver, message) => {
+                NodeCommand::ReceiverMessage(_commander, sender, receiver, message) => {
                     let process = self.process.clone();
                     process.lock().unwrap().handle_receive(
                         &mut self,
@@ -349,7 +347,7 @@ impl Node {
                         Err(e) => error!("could not send update progress ({}) from {:?} to {:?}: {:?}", progress.clone(), &context.aid, requestor, e)
                     };
                 }
-                NodeCommand::UpdateProgress(progressor, output, progress) => {
+                NodeCommand::UpdateProgress(_progressor, output, progress) => {
                     self.inputs
                         .values_mut()
                         .for_each(|input: &mut Pin| {

@@ -6,7 +6,6 @@ use proc_flow_lib as pf;
 extern crate log;
 extern crate simplelog;
 
-use axiom::prelude::*;
 use simplelog::*;
 
 use serde::{Deserialize, Serialize};
@@ -43,7 +42,7 @@ fn main() {
         Some(graph_ref) => {
             info!("found graphics graph info");
             match catalogue.get_graph_version(&graph_ref) {
-                Some(version) => {
+                Some(_version) => {
                     info!("found graphics node version");
                 }
                 None => {

@@ -15,7 +15,7 @@ pub fn register() -> Vec<(GraphInfo, u64)> {
 use axiom::prelude::*;
 use crate::node::*;
 use crate::catalogue::*;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 
 /// Gives back a new internal node object from a given UUID, if it exists.
 pub fn create(controller: Aid, catalogue: Arc<Mutex<Catalogue>>, uuid: uuid::Uuid, version: u64, instance_id: uuid::Uuid) -> Option<Node> {
