@@ -1,5 +1,4 @@
 use crate::node::*;
-use dynamic::*;
 
 use crate::graph::*;
 use crate::catalogue::*;
@@ -11,7 +10,7 @@ pub struct NodeUtilLogV1 {
 }
 
 impl Nodeable for NodeUtilLogV1 {
-    fn get_io(&self, catalogue: &Catalogue) -> (std::vec::Vec<Pin>, std::vec::Vec<Pin>) {
+    fn get_io(&self, _catalogue: &Catalogue) -> (std::vec::Vec<Pin>, std::vec::Vec<Pin>) {
         let mut inputs = Vec::new();
         let mut outputs = Vec::new();
         inputs.push(
@@ -59,7 +58,7 @@ impl Nodeable for NodeUtilLogV1 {
         (inputs, outputs)
     }
 
-    fn get_rs(&self, catalogue: &Catalogue) -> (std::vec::Vec<Pin>, std::vec::Vec<Pin>) {
+    fn get_rs(&self, _catalogue: &Catalogue) -> (std::vec::Vec<Pin>, std::vec::Vec<Pin>) {
         let mut recvs = Vec::new();
         let mut sends = Vec::new();
         recvs.push(
@@ -118,24 +117,21 @@ impl Nodeable for NodeUtilLogV1 {
         &mut self,
         node: &mut Node,
         output_info: PinInfo,
-        context: &Context,
-        parameter: &Option<Message>,
+        _context: &Context,
+        _parameter: &Option<Message>,
     ) -> Result<Option<Message>, String> {
         match node.outputs.get_mut(&output_info.uuid) {
             Some(output) => {
-                let id_info = uuid::Uuid::parse_str("44a986b1-dc09-45d9-ab65-e2c0c7b6f5ce").unwrap();
-                let id_warn = uuid::Uuid::parse_str("d792d30a-0986-4f8c-bf6d-5fd0f4ac3d05").unwrap();
-                let id_error = uuid::Uuid::parse_str("2af8bac9-9d56-4f6f-b997-68b05d1f3e55").unwrap();
                 match output.info.uuid {
-                    id_info => {
+                    id_info if id_info == uuid::Uuid::parse_str("44a986b1-dc09-45d9-ab65-e2c0c7b6f5ce").unwrap() => {
                         let input = node.inputs.get(&uuid::Uuid::parse_str("5e6ab872-5cca-4e01-8dbb-2df843102dc0").unwrap()).expect("could not find corresponding log input");
                         Ok(input.value.clone())
                     },
-                    id_warn => {
+                    id_warn if id_warn == uuid::Uuid::parse_str("d792d30a-0986-4f8c-bf6d-5fd0f4ac3d05").unwrap() => {
                         let input = node.inputs.get(&uuid::Uuid::parse_str("2916bcb7-2943-4426-8af4-292bd8b1f417").unwrap()).expect("could not find corresponding log input");
                         Ok(input.value.clone())
                     },
-                    id_error => {
+                    id_error if id_error == uuid::Uuid::parse_str("2af8bac9-9d56-4f6f-b997-68b05d1f3e55").unwrap() => {
                         let input = node.inputs.get(&uuid::Uuid::parse_str("f39a4e33-32f3-485f-b634-e539c98dbe94").unwrap()).expect("could not find corresponding log input");
                         Ok(input.value.clone())
                     },
@@ -149,24 +145,22 @@ impl Nodeable for NodeUtilLogV1 {
     }
     fn handle_receive(
         &mut self,
-        node: &mut Node,
-        sender: &PinRef,
-        receiver: &PinRef,
-        context: &Context,
-        message: &Message,
+        _node: &mut Node,
+        _sender: &PinRef,
+        _receiver: &PinRef,
+        _context: &Context,
+        _message: &Message,
     ) { todo!() }
 }
 
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 
 impl NodeUtilLogV1 {
-    pub fn new(catalogue: Arc<Mutex<Catalogue>>, x: f32, y: f32) -> Node {
+    pub fn new(controller: Aid, catalogue: Arc<Mutex<Catalogue>>, instance_id: uuid::Uuid) -> Node {
         let process = Self { };
         Node::new(
-            NodeInfo {
-                uuid: uuid::Uuid::new_v4(),
-                x,
-                y,
+            NodeInstanceInfo {
+                uuid: instance_id,
                 data: None,
                 graph: GraphRef {
                     name: String::from("Log"),
@@ -176,7 +170,8 @@ impl NodeUtilLogV1 {
                 }
             },
             Box::new(process),
-            catalogue.clone()
+            catalogue.clone(),
+            controller
         )
     }
 }
@@ -194,13 +189,11 @@ pub fn register() -> (GraphInfo, u64) {
     )
 }
 
-use crate::node::*;
-
 /// Gives back a new internal node object from a given UUID, if it exists.
-pub fn create(catalogue: Arc<Mutex<Catalogue>>, x: f32, y: f32, uuid: uuid::Uuid, version: u64) -> Option<Node> {
+pub fn create(controller: Aid, catalogue: Arc<Mutex<Catalogue>>, uuid: uuid::Uuid, version: u64, instance_id: uuid::Uuid) -> Option<Node> {
     if uuid == uuid::Uuid::parse_str("fd41d8ef-d10f-4499-8a90-35b73d8ff246").unwrap() {
         return match version {
-            1 => Some(NodeUtilLogV1::new(catalogue, x, y)),
+            1 => Some(NodeUtilLogV1::new(controller, catalogue, instance_id)),
             _ => None
         };
     }
