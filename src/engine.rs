@@ -40,6 +40,8 @@ impl Engine {
         let (send, recv) = crossbeam::unbounded();
         let nodes = HashMap::new();
 
+        catalogue.lock().unwrap().load_default_libraries();
+
         // Create and spawn the controller.
         let controller_state = Controller {
             nodes,
@@ -65,10 +67,21 @@ impl Engine {
             info!("Received the number {}", num);
         }
     }
-    pub fn boot_graph(&mut self, id: uuid::Uuid, version: u64, instance_id: uuid::Uuid) {
+    pub fn boot_graph(&mut self, id: uuid::Uuid, version: u64, instance_id: uuid::Uuid) -> Option<Aid> {
         let _ = self.controller.send_new(ControllerCommand::BootGraph(id, version, instance_id, None));
+        if let Some(msg) = self.recv.recv().unwrap().content_as::<ControllerResponse>() {
+            match &*msg {
+                ControllerResponse::GraphBooted(_instance, actor) => {
+                    return actor.clone();
+                }
+            }
+        }
+        None
     }
     pub fn boot_cluster(&mut self, _port: u64) {
+    }
+    pub fn wait(&mut self) {
+        self.system.await_shutdown(None);
     }
 }
 
@@ -128,54 +141,40 @@ impl Controller {
                 },
                 ControllerCommand::BootGraph(graph_id, version, instance_id, requestor) => {
                     info!("boot sequence initiated for graph {} version {}", graph_id, version);
-                    let cat = self.catalogue.lock().unwrap();
 
                     // Attempt to find the graph in the catalogue.
-                    let graph_ref = cat.get_graph_ref(graph_id.clone(), version.clone());
+                    let graph_ref: Option<crate::graph::GraphRef>;
+                    {
+                        let cat = self.catalogue.lock().unwrap();
+                        graph_ref = cat.get_graph_ref(graph_id.clone(), version.clone());
+                    }
+
                     match graph_ref {
                         Some(graph_ref) => {
                             info!("graph {} found in catalogue with name {}", graph_id, graph_ref.name.clone());
 
-                            // Make sure the specific version of the graph exists.
-                            match cat.has_graph_version(&graph_ref) {
-                                true => {
-                                    info!("graph {} : {} version {} found in catalogue", graph_id, graph_ref.name.clone(), version.clone());
-
-                                    // Check if the library is internal or not.
-                                    let _internal_lib = uuid::Uuid::parse_str("b0fa443c-20d0-4c2a-acf9-76c63af3cbed").unwrap();
-                                    if graph_ref.library.expect("library does not have an UUID") == _internal_lib {
-                                        // Create an internal library node.
-                                        let node = crate::nodes::create(context.aid, self.catalogue.clone(), graph_id.clone(), version.clone(), instance_id.clone());
-                                        match node {
-                                            Some(node) => {
-                                                info!("internal graph {} : {} version {} node data created", graph_id, graph_ref.name.clone(), version.clone());
-                                                match context.system.spawn().with(node, crate::node::Node::handle) {
-                                                    Ok(actor) => {
-                                                        info!("internal graph {} : {} version {} node actor spawned", graph_id, graph_ref.name.clone(), version.clone());
-                                                        match requestor {
-                                                            Some(requestor) => {
-                                                                let _ = requestor.send_new(ControllerResponse::GraphBooted(instance_id.clone(), Some(actor)));
-                                                            },
-                                                            None => {
-                                                                let _ = self.sender.send(Message::new(ControllerResponse::GraphBooted(instance_id.clone(), Some(actor))));
-                                                            }
-                                                        }
+                            // Check if the library is internal or not.
+                            let internal_lib = uuid::Uuid::parse_str("b0fa443c-20d0-4c2a-acf9-76c63af3cbed").unwrap();
+                            if graph_ref.library.expect("library does not have an UUID") == internal_lib {
+                                // Create an internal library node.
+                                let node = crate::nodes::create(context.aid, self.catalogue.clone(), graph_id.clone(), version.clone(), instance_id.clone());
+                                match node {
+                                    Some(node) => {
+                                        info!("internal graph {} : {} version {} node data created", graph_id, graph_ref.name.clone(), version.clone());
+                                        match context.system.spawn().with(node, crate::node::Node::handle) {
+                                            Ok(actor) => {
+                                                info!("internal graph {} : {} version {} node actor spawned", graph_id, graph_ref.name.clone(), version.clone());
+                                                match requestor {
+                                                    Some(requestor) => {
+                                                        let _ = requestor.send_new(ControllerResponse::GraphBooted(instance_id.clone(), Some(actor)));
                                                     },
-                                                    Err(e) => {
-                                                        error!("internal graph {} : {} version {} node actor could not be spawned: {:?}", graph_id, graph_ref.name.clone(), version.clone(), e);
-                                                        match requestor {
-                                                            Some(requestor) => {
-                                                                let _ = requestor.send_new(ControllerResponse::GraphBooted(instance_id.clone(), None));
-                                                            },
-                                                            None => {
-                                                                let _ = self.sender.send(Message::new(ControllerResponse::GraphBooted(instance_id.clone(), None)));
-                                                            }
-                                                        }
+                                                    None => {
+                                                        let _ = self.sender.send(Message::new(ControllerResponse::GraphBooted(instance_id.clone(), Some(actor))));
                                                     }
                                                 }
                                             },
-                                            None => {
-                                                error!("internal graph {} : {} version {} could not be created", graph_id, graph_ref.name.clone(), version.clone());
+                                            Err(e) => {
+                                                error!("internal graph {} : {} version {} node actor could not be spawned: {:?}", graph_id, graph_ref.name.clone(), version.clone(), e);
                                                 match requestor {
                                                     Some(requestor) => {
                                                         let _ = requestor.send_new(ControllerResponse::GraphBooted(instance_id.clone(), None));
@@ -186,11 +185,32 @@ impl Controller {
                                                 }
                                             }
                                         }
-                                    } else {
-                                        // Create a user created graph node, a single node that represents the whole graph.
+                                    },
+                                    None => {
+                                        error!("internal graph {} : {} version {} could not be created", graph_id, graph_ref.name.clone(), version.clone());
+                                        match requestor {
+                                            Some(requestor) => {
+                                                let _ = requestor.send_new(ControllerResponse::GraphBooted(instance_id.clone(), None));
+                                            },
+                                            None => {
+                                                let _ = self.sender.send(Message::new(ControllerResponse::GraphBooted(instance_id.clone(), None)));
+                                            }
+                                        }
                                     }
-                                },
-                                false => {
+                                }
+                            } else {
+                                // Create a user created graph node, a single node that represents the whole graph.
+                                
+
+                                // Make sure the specific version of the graph exists.
+                                let has_version: bool;
+                                {
+                                    let cat = self.catalogue.lock().unwrap();
+                                    has_version = cat.has_graph_version(&graph_ref);
+                                }
+                                if has_version {
+                                    info!("graph {} : {} version {} found in catalogue", graph_id, graph_ref.name.clone(), version.clone());
+                                } else {
                                     error!("graph {} : {} does not have version {} in catalogue", graph_id, graph_ref.name.clone(), version.clone());
                                     match requestor {
                                         Some(requestor) => {
