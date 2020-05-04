@@ -5,9 +5,20 @@ use axiom::actors::*;
 use crate::graph::*;
 use crate::catalogue::*;
 
+use std::collections::HashMap;
+
+/// 
+/// Represents a user created graph that is loaded from a library.
+/// When launched, this will ask the controller to spawn the appropriate nodes for whichever output or recieve that is activated.
+/// 
 #[derive(Default)]
 pub struct NodeMetaGraph {
+    /// Graph version that this graph points to.
     pub graph: Option<GraphRef>,
+    /// When the graph has been launched, the in memory representation of the actual graph version.
+    pub instance: Option<VersionInfo>,
+    /// Actively loaded and running nodes that belong to this graph, keyed by their instance UUID within the graph file.
+    pub nodes: HashMap<uuid::Uuid, Aid>,
 }
 
 use log::*;
