@@ -39,15 +39,20 @@ fn main() {
     let mut catalogue = pf::catalogue::Catalogue::new();
     catalogue.load_default_libraries();
 
-    match catalogue.get_graph_version(
-        uuid::Uuid::parse_str("2361f8a5-2330-41e8-a4ad-492b3c15febe").unwrap(),
-        1,
-    ) {
-        Some(version) => {
-            info!("found graphics node version");
+    match catalogue.get_graph_ref(uuid::Uuid::parse_str("2361f8a5-2330-41e8-a4ad-492b3c15febe").unwrap(), 1) {
+        Some(graph_ref) => {
+            info!("found graphics graph info");
+            match catalogue.get_graph_version(&graph_ref) {
+                Some(version) => {
+                    info!("found graphics node version");
+                }
+                None => {
+                    error!("could not find graphics node version");
+                }
+            }
         }
         None => {
-            error!("could not find graphics node version");
+            error!("could not find graphics graph info");
         }
     }
 
