@@ -1,20 +1,14 @@
 use serde::{Deserialize, Serialize};
 
 use dirs::document_dir;
-use std::fs::{self, DirEntry};
-use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use log::*;
 
-use uuid::*;
-
 use super::graph::*;
 use super::library::*;
-use super::node::*;
 
 fn load_libraries() -> Vec<Library> {
-    println!("test");
     let mut libs = Vec::new();
     let mut internal = Library {
         info: LibraryInfo {
@@ -96,12 +90,21 @@ impl Catalogue {
         None
     }
 
-    pub fn get_graph_version(&self, id: uuid::Uuid, version: u64) -> Option<VersionInfo> {
+    pub fn get_graph_version(&self, graph_ref: &GraphRef) -> Option<VersionInfo> {
         for lib in self.libraries.values() {
-            if let Some(graph) = get_graph_version_from_library(&lib, id, version) {
+            if let Some(graph) = get_graph_version_from_library(&lib, graph_ref.uuid, graph_ref.version) {
                 return Some(graph.clone());
             };
         }
         None
+    }
+
+    pub fn has_graph_version(&self, graph_ref: &GraphRef) -> bool {
+        for lib in self.libraries.values() {
+            if has_graph_version_from_library(&lib, graph_ref.uuid, graph_ref.version) {
+                return true;
+            };
+        }
+        false
     }
 }
