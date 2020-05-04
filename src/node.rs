@@ -103,12 +103,34 @@ impl Named for Pin {
     }
 }
 
+/// Information for a live instance of a node in the actor system.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct NodeInstanceInfo {
+    /// The id of this individual instance of the node.
+    pub uuid: uuid::Uuid,
+    /// Data variables used by the node to store data that is not held on any inputs, including large array data, matrix data, and a string or many strings pointing to relative file paths or not-recommended absolute file paths of data files.
+    /// Basically just whatever the node needs to hold.
+    pub data: Option<Vec<Datum>>,
+    /// The reference to the graph that this node instance represents.
+    pub graph: GraphRef,
+}
+
+impl NodeInstanceInfo {
+    pub fn from_info(info: &NodeInfo) -> Self {
+        Self {
+            uuid: info.uuid.clone(),
+            data: info.data.clone(),
+            graph: info.graph.clone()
+        }
+    }
+}
+
 ///
 /// General node container.
 ///
 pub struct Node {
     /// The instance data for this node, pulled from the library.
-    pub info: NodeInfo,
+    pub info: NodeInstanceInfo,
     /// The actual input pins to this node.
     pub inputs: std::collections::HashMap<uuid::Uuid, Pin>,
     /// The actual output pins from this node.
@@ -121,9 +143,11 @@ pub struct Node {
     /// Arc as a threadsafe container.
     /// Mutex to mutate it,
     /// Box to hold it in memory.
-    pub process: Arc<Mutex<Box<dyn Nodeable>>>,
+    pub process: Arc<Mutex<Box<dyn Nodeable + Send + Sync + 'static>>>,
     /// A pointer to an mutable catalogue.
     pub catalogue: Arc<Mutex<Catalogue>>,
+    /// Controller that this node belongs to.
+    pub controller: Aid,
 }
 
 impl Named for Node {
@@ -199,7 +223,7 @@ fn pin_vec_to_hashmap(pins: Vec<Pin>) -> std::collections::HashMap<uuid::Uuid, P
 /// Implementation for a node.
 ///
 impl Node {
-    pub fn new(info: NodeInfo, process: Box<dyn Nodeable>, catalogue: Arc<Mutex<Catalogue>>) -> Self {
+    pub fn new(info: NodeInstanceInfo, process: Box<dyn Nodeable + Send + Sync>, catalogue: Arc<Mutex<Catalogue>>, controller: Aid) -> Self {
         let cat = catalogue.lock().unwrap();
         let (vinputs, voutputs) = process.get_io(&cat);
         let (vreceives, vsends) = process.get_rs(&cat);
@@ -214,7 +238,8 @@ impl Node {
             receives,
             sends,
             process: Arc::new(Mutex::new(process)),
-            catalogue: catalogue.clone()
+            catalogue: catalogue.clone(),
+            controller
         }
     }
     ///
