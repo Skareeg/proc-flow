@@ -65,33 +65,39 @@ impl Engine {
             info!("Received the number {}", num);
         }
     }
-    pub fn boot_graph(&mut self, id: uuid::Uuid, version: u64) {
-        let cat = self.catalogue.lock().expect("can't lock the catalogue mutex when attempting to call boot_graph on engine.");
-        let ver = cat.get_graph_version(id, version);
-        match ver {
-            Some(ver) => {},
-            None => {}
-        }
+    pub fn boot_graph(&mut self, id: uuid::Uuid, version: u64, instance_id: uuid::Uuid) {
+        let _ = self.controller.send_new(ControllerCommand::BootGraph(id, version, instance_id, None));
     }
-    pub fn boot_cluster(&mut self, port: u64) {
+    pub fn boot_cluster(&mut self, _port: u64) {
     }
 }
 
 /// 
-/// Each possible command from the engine to the controller.
+/// Each possible command from the engine or a node to the controller.
 /// 
 #[derive(Serialize, Deserialize)]
-enum ControllerCommand {
+pub enum ControllerCommand {
     /// Test command to ensure that the controller is functional.
     /// TODO: Remove when the system is working.
     GiveMe5,
     /// Boots up a graph instance to gather IO from.
     /// UUID is the graph's UUID in the catalogue.
     /// Number is the version number to load.
-    BootGraph(uuid::Uuid, u64),
+    /// UUID is the instance of that graph.
+    /// Id is the node that requested this boot, if available.
+    BootGraph(uuid::Uuid, u64, uuid::Uuid, Option<Aid>),
     /// Sends a message to its target, including remote destinations.
     /// TODO: Actual cluster implementation.
     RouteMessage(Aid, Aid, Message),
+}
+
+/// 
+/// Each possible response from the controller.
+/// 
+#[derive(Serialize, Deserialize)]
+pub enum ControllerResponse {
+    /// Presents that a graph was booted correctly.
+    GraphBooted(uuid::Uuid, Option<Aid>),
 }
 
 /// 
@@ -114,20 +120,107 @@ impl Controller {
     ///
     /// Handle messages sent by other actors.
     ///
-    pub async fn handle(mut self, context: Context, message: Message) -> ActorResult<Self> {
+    pub async fn handle(self, context: Context, message: Message) -> ActorResult<Self> {
         if let Some(msg) = message.content_as::<ControllerCommand>() {
             match &*msg {
                 ControllerCommand::GiveMe5 => {
                     let _ = self.sender.send(Message::new(5 as u64));
                 },
-                ControllerCommand::BootGraph(id, version) => {
-                    info!("boot sequence initiated for graph {} version {}", id, version);
+                ControllerCommand::BootGraph(graph_id, version, instance_id, requestor) => {
+                    info!("boot sequence initiated for graph {} version {}", graph_id, version);
+                    let cat = self.catalogue.lock().unwrap();
+
+                    // Attempt to find the graph in the catalogue.
+                    let graph_ref = cat.get_graph_ref(graph_id.clone(), version.clone());
+                    match graph_ref {
+                        Some(graph_ref) => {
+                            info!("graph {} found in catalogue with name {}", graph_id, graph_ref.name.clone());
+
+                            // Make sure the specific version of the graph exists.
+                            match cat.has_graph_version(&graph_ref) {
+                                true => {
+                                    info!("graph {} : {} version {} found in catalogue", graph_id, graph_ref.name.clone(), version.clone());
+
+                                    // Check if the library is internal or not.
+                                    let _internal_lib = uuid::Uuid::parse_str("b0fa443c-20d0-4c2a-acf9-76c63af3cbed").unwrap();
+                                    if graph_ref.library.expect("library does not have an UUID") == _internal_lib {
+                                        // Create an internal library node.
+                                        let node = crate::nodes::create(context.aid, self.catalogue.clone(), graph_id.clone(), version.clone(), instance_id.clone());
+                                        match node {
+                                            Some(node) => {
+                                                info!("internal graph {} : {} version {} node data created", graph_id, graph_ref.name.clone(), version.clone());
+                                                match context.system.spawn().with(node, crate::node::Node::handle) {
+                                                    Ok(actor) => {
+                                                        info!("internal graph {} : {} version {} node actor spawned", graph_id, graph_ref.name.clone(), version.clone());
+                                                        match requestor {
+                                                            Some(requestor) => {
+                                                                let _ = requestor.send_new(ControllerResponse::GraphBooted(instance_id.clone(), Some(actor)));
+                                                            },
+                                                            None => {
+                                                                let _ = self.sender.send(Message::new(ControllerResponse::GraphBooted(instance_id.clone(), Some(actor))));
+                                                            }
+                                                        }
+                                                    },
+                                                    Err(e) => {
+                                                        error!("internal graph {} : {} version {} node actor could not be spawned: {:?}", graph_id, graph_ref.name.clone(), version.clone(), e);
+                                                        match requestor {
+                                                            Some(requestor) => {
+                                                                let _ = requestor.send_new(ControllerResponse::GraphBooted(instance_id.clone(), None));
+                                                            },
+                                                            None => {
+                                                                let _ = self.sender.send(Message::new(ControllerResponse::GraphBooted(instance_id.clone(), None)));
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            None => {
+                                                error!("internal graph {} : {} version {} could not be created", graph_id, graph_ref.name.clone(), version.clone());
+                                                match requestor {
+                                                    Some(requestor) => {
+                                                        let _ = requestor.send_new(ControllerResponse::GraphBooted(instance_id.clone(), None));
+                                                    },
+                                                    None => {
+                                                        let _ = self.sender.send(Message::new(ControllerResponse::GraphBooted(instance_id.clone(), None)));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        // Create a user created graph node, a single node that represents the whole graph.
+                                    }
+                                },
+                                false => {
+                                    error!("graph {} : {} does not have version {} in catalogue", graph_id, graph_ref.name.clone(), version.clone());
+                                    match requestor {
+                                        Some(requestor) => {
+                                            let _ = requestor.send_new(ControllerResponse::GraphBooted(instance_id.clone(), None));
+                                        },
+                                        None => {
+                                            let _ = self.sender.send(Message::new(ControllerResponse::GraphBooted(instance_id.clone(), None)));
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        None => {
+                            error!("graph {} does not exist in the catalogue", graph_id);
+                            match requestor {
+                                Some(requestor) => {
+                                    let _ = requestor.send_new(ControllerResponse::GraphBooted(instance_id.clone(), None));
+                                },
+                                None => {
+                                    let _ = self.sender.send(Message::new(ControllerResponse::GraphBooted(instance_id.clone(), None)));
+                                }
+                            }
+                        }
+                    }
                 },
                 ControllerCommand::RouteMessage(sender, receiver, message) => {
                     trace!("message from {:?} to {:?}", sender, receiver);
                     match receiver.send(message.clone()) {
                         Ok(()) => {},
-                        Err(e) => {
+                        Err(_e) => {
                         }
                     }
                 }
