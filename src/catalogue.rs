@@ -22,11 +22,13 @@ fn load_libraries() -> Vec<Library> {
     };
     for (info, versions) in super::nodes::register() {
         internal.graphs.insert(info.uuid.clone(), LibraryGraphInfo {
-            info,
+            info: info.clone(),
             path: PathBuf::default(),
-            versions
+            versions: versions.clone()
         });
+        info!("added graph {} : {} with {} versions to internal library", info.uuid.clone(), info.name.clone(), versions.clone());
     }
+    info!("added internal libraries to catalogue");
     let mut applibs = match std::env::current_dir() {
         Ok(cdir) => get_libraries(cdir.join(PathBuf::from("data"))),
         Err(e) => {
@@ -37,6 +39,7 @@ fn load_libraries() -> Vec<Library> {
             Vec::new()
         }
     };
+    info!("added application libraries to catalogue");
     let mut doclibs = match document_dir() {
         Some(ddir) => {
             get_libraries(ddir.join(PathBuf::from("ProcFlow").join(PathBuf::from("Libraries"))))
@@ -46,6 +49,7 @@ fn load_libraries() -> Vec<Library> {
             Vec::new()
         }
     };
+    info!("added document libraries to catalogue");
 
     libs.push(internal);
     libs.append(&mut applibs);
