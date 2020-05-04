@@ -89,6 +89,9 @@ enum ControllerCommand {
     /// UUID is the graph's UUID in the catalogue.
     /// Number is the version number to load.
     BootGraph(uuid::Uuid, u64),
+    /// Sends a message to its target, including remote destinations.
+    /// TODO: Actual cluster implementation.
+    RouteMessage(Aid, Aid, Message),
 }
 
 /// 
@@ -119,6 +122,14 @@ impl Controller {
                 },
                 ControllerCommand::BootGraph(id, version) => {
                     info!("boot sequence initiated for graph {} version {}", id, version);
+                },
+                ControllerCommand::RouteMessage(sender, receiver, message) => {
+                    trace!("message from {:?} to {:?}", sender, receiver);
+                    match receiver.send(message.clone()) {
+                        Ok(()) => {},
+                        Err(e) => {
+                        }
+                    }
                 }
             }
         }
