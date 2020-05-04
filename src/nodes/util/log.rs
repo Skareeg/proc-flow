@@ -119,6 +119,7 @@ impl Nodeable for NodeUtilLogV1 {
         node: &mut Node,
         output_info: PinInfo,
         context: &Context,
+        parameter: &Option<Message>,
     ) -> Result<Option<Message>, String> {
         match node.outputs.get_mut(&output_info.uuid) {
             Some(output) => {

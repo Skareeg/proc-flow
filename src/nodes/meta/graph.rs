@@ -11,6 +11,7 @@ pub struct NodeMetaGraph {
 }
 
 use log::*;
+use axiom::prelude::*;
 
 impl Nodeable for NodeMetaGraph {
     fn get_io(&self, catalogue: &Catalogue) -> (Vec<Pin>, Vec<Pin>) {
@@ -34,7 +35,8 @@ impl Nodeable for NodeMetaGraph {
         node: &mut Node,
         output_info: PinInfo,
         context: &Context,
-    ) -> Result<Option<axiom::message::Message>, String> { todo!() }
+        parameter: &Option<Message>,
+    ) -> Result<Option<Message>, String> { todo!() }
     fn handle_receive(
         &mut self,
         node: &mut Node,

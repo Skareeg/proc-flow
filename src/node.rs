@@ -30,6 +30,7 @@ pub trait Nodeable {
         node: &mut Node,
         output_info: PinInfo,
         context: &Context,
+        parameter: &Option<Message>,
     ) -> Result<Option<Message>, String>;
     /// Reacts to an incoming command from another node.
     fn handle_receive(
@@ -142,7 +143,8 @@ pub enum NodeCommand {
     /// First id is the input pin.
     /// Second id is the output pin.
     /// String is the datatype to request.
-    ComputeOutput(Aid, PinRef, PinRef, String),
+    /// Optional message is a parameter or list of parameters to send to the output pin's function.
+    ComputeOutput(Aid, PinRef, PinRef, String, Option<Message>),
     // /// Sends an output to another nodes input.
     // /// Aid is the sending node.
     // /// First pin is the input pin.
@@ -222,7 +224,7 @@ impl Node {
         if let Some(msg) = message.content_as::<NodeCommand>() {
             match &*msg {
                 // This is a received request to process our outputs if needed and send them forward.
-                NodeCommand::ComputeOutput(commander, input, output, datatype) => {
+                NodeCommand::ComputeOutput(commander, input, output, datatype, parameter) => {
                     // If this is a request for the ouput of a pin.
                     match output.pin {
                         Some(requested_output_pin) => {
@@ -264,7 +266,8 @@ impl Node {
                                         let new_output_value = process.lock().unwrap().compute_output(
                                             &mut self,
                                             output_info.clone(),
-                                            &context
+                                            &context,
+                                            &parameter
                                         );
                                         match new_output_value {
                                             Ok(new_output_value) => {
