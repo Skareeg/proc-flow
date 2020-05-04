@@ -88,7 +88,7 @@ enum ControllerCommand {
     /// Boots up a graph instance to gather IO from.
     /// UUID is the graph's UUID in the catalogue.
     /// Number is the version number to load.
-    BootGraph(uuid::Uuid, u64)
+    BootGraph(uuid::Uuid, u64),
 }
 
 /// 
