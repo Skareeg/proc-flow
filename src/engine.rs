@@ -160,7 +160,6 @@ impl Controller {
                                 let node = crate::nodes::create(context.aid, self.catalogue.clone(), graph_id.clone(), version.clone(), instance_id.clone());
                                 match node {
                                     Some(node) => {
-                                        info!("internal graph {} : {} version {} node data created", graph_id, graph_ref.name.clone(), version.clone());
                                         match context.system.spawn().with(node, crate::node::Node::handle) {
                                             Ok(actor) => {
                                                 info!("internal graph {} : {} version {} node actor spawned", graph_id, graph_ref.name.clone(), version.clone());
