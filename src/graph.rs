@@ -201,3 +201,53 @@ pub fn get_graph_version_from_library(
         }
     }
 }
+
+
+pub fn has_graph_version_from_library(
+    lib: &Library,
+    id: uuid::Uuid,
+    version: u64,
+) -> bool {
+    match lib.graphs.get(&id) {
+        Some(pair) => {
+            let graph_path = &pair.path;
+            let graph_info = &pair.info;
+            let version_path = graph_path.join(PathBuf::from(format!("{}", version)));
+            match version_path.is_dir() {
+                true => {
+                    let version_json = version_path.join(PathBuf::from("version.json"));
+                    match version_json.is_file() {
+                        true => {
+                            true
+                        },
+                        false => {
+                            error!(
+                                "version file {} does not exist for {} graph with id of {}",
+                                version_json.display(),
+                                graph_info.name,
+                                graph_info.uuid
+                            );
+                            false
+                        }
+                    }
+                }
+                false => {
+                    error!(
+                        "version directory {} does not exist for {} graph with id of {}",
+                        version_path.display(),
+                        graph_info.name,
+                        graph_info.uuid
+                    );
+                    false
+                }
+            }
+        }
+        _ => {
+            error!(
+                "graph with id of {} does not exist in the {} library with id of {}",
+                id, lib.info.name, lib.info.uuid
+            );
+            false
+        }
+    }
+}
