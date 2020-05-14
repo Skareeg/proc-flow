@@ -1,15 +1,15 @@
 use crate::node::*;
 use axiom::actors::*;
 
-use crate::graph::*;
 use crate::catalogue::*;
+use crate::graph::*;
 
 use std::collections::HashMap;
 
-/// 
+///
 /// Represents a user created graph that is loaded from a library.
 /// When launched, this will ask the controller to spawn the appropriate nodes for whichever output or recieve that is activated.
-/// 
+///
 #[derive(Default)]
 pub struct NodeMetaGraph {
     /// Graph version that this graph points to.
@@ -20,8 +20,8 @@ pub struct NodeMetaGraph {
     pub nodes: HashMap<uuid::Uuid, Aid>,
 }
 
-use log::*;
 use axiom::prelude::*;
+use log::*;
 
 impl Nodeable for NodeMetaGraph {
     fn get_io(&self, _catalogue: &Catalogue) -> (Vec<Pin>, Vec<Pin>) {
@@ -30,8 +30,8 @@ impl Nodeable for NodeMetaGraph {
         match self.graph.clone() {
             Some(graph) => {
                 trace!("retrieving IO for graph {:?}", graph);
-            },
-            None => error!("no graph when retrieving IO")
+            }
+            None => error!("no graph when retrieving IO"),
         }
         (ins, outs)
     }
@@ -46,7 +46,9 @@ impl Nodeable for NodeMetaGraph {
         _output_info: PinInfo,
         _context: &Context,
         _parameter: &Option<Message>,
-    ) -> Result<Option<Message>, String> { todo!() }
+    ) -> Result<Option<Message>, String> {
+        todo!()
+    }
     fn handle_receive(
         &mut self,
         _node: &mut Node,
@@ -54,5 +56,7 @@ impl Nodeable for NodeMetaGraph {
         _receiver: &PinRef,
         _context: &Context,
         _message: &axiom::message::Message,
-    ) { todo!() }
+    ) {
+        todo!()
+    }
 }

@@ -44,12 +44,18 @@ pub fn get_library_graphs(
                                 Ok(info) => {
                                     let name = info.name.clone();
                                     let mut versions: u64 = 0;
-                                    for version_entry in walkdir::WalkDir::new(&entry).min_depth(1).max_depth(1) {
+                                    for version_entry in
+                                        walkdir::WalkDir::new(&entry).min_depth(1).max_depth(1)
+                                    {
                                         if let Ok(version_entry) = version_entry {
                                             if version_entry.path().is_dir() {
                                                 let vestr = version_entry.file_name().to_str();
                                                 if let Some(vestr) = vestr {
-                                                    if String::from(vestr).trim().parse::<u64>().is_ok() {
+                                                    if String::from(vestr)
+                                                        .trim()
+                                                        .parse::<u64>()
+                                                        .is_ok()
+                                                    {
                                                         versions += 1;
                                                     }
                                                 }
@@ -61,10 +67,15 @@ pub fn get_library_graphs(
                                         LibraryGraphInfo {
                                             path: entry.to_path_buf(),
                                             info: info,
-                                            versions: versions.clone()
+                                            versions: versions.clone(),
                                         },
                                     );
-                                    info!("added graph info {}: {} with {} versions", entry.display(), name, versions);
+                                    info!(
+                                        "added graph info {}: {} with {} versions",
+                                        entry.display(),
+                                        name,
+                                        versions
+                                    );
                                 }
                                 Err(e) => error!("could not parse {}: {}", graphjson.display(), e),
                             },

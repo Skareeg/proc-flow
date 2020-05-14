@@ -27,17 +27,24 @@ impl PinInfo {
             datatype,
             valuable: None,
             dimensions: None,
-            expandable: None
+            expandable: None,
         }
     }
-    pub fn new_extended(name: String, uuid: uuid::Uuid, datatype: String, valuable: Option<bool>, dimensions: Option<u16>, expandable: Option<bool>) -> Self {
+    pub fn new_extended(
+        name: String,
+        uuid: uuid::Uuid,
+        datatype: String,
+        valuable: Option<bool>,
+        dimensions: Option<u16>,
+        expandable: Option<bool>,
+    ) -> Self {
         Self {
             name,
             uuid,
             datatype,
             valuable,
             dimensions,
-            expandable
+            expandable,
         }
     }
 }
@@ -77,7 +84,6 @@ pub struct NodeInfo {
     /// The reference to the graph that this node instance represents.
     pub graph: GraphRef,
 }
-
 
 ///
 /// Reference to a pin within the graph.
@@ -202,12 +208,7 @@ pub fn get_graph_version_from_library(
     }
 }
 
-
-pub fn has_graph_version_from_library(
-    lib: &Library,
-    id: uuid::Uuid,
-    version: u64,
-) -> bool {
+pub fn has_graph_version_from_library(lib: &Library, id: uuid::Uuid, version: u64) -> bool {
     match lib.graphs.get(&id) {
         Some(pair) => {
             let graph_path = &pair.path;
@@ -217,9 +218,7 @@ pub fn has_graph_version_from_library(
                 true => {
                     let version_json = version_path.join(PathBuf::from("version.json"));
                     match version_json.is_file() {
-                        true => {
-                            true
-                        },
+                        true => true,
                         false => {
                             error!(
                                 "version file {} does not exist for {} graph with id of {}",

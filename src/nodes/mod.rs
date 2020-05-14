@@ -1,7 +1,7 @@
 //pub mod math;
 //pub mod string;
-pub mod util;
 pub mod meta;
+pub mod util;
 
 use crate::graph::*;
 
@@ -12,12 +12,18 @@ pub fn register() -> Vec<(GraphInfo, u64)> {
     nodes
 }
 
-use axiom::prelude::*;
-use crate::node::*;
 use crate::catalogue::*;
+use crate::node::*;
+use axiom::prelude::*;
 use std::sync::{Arc, Mutex};
 
 /// Gives back a new internal node object from a given UUID, if it exists.
-pub fn create(controller: Aid, catalogue: Arc<Mutex<Catalogue>>, uuid: uuid::Uuid, version: u64, instance_id: uuid::Uuid) -> Option<Node> {
+pub fn create(
+    controller: Aid,
+    catalogue: Arc<Mutex<Catalogue>>,
+    uuid: uuid::Uuid,
+    version: u64,
+    instance_id: uuid::Uuid,
+) -> Option<Node> {
     util::create(controller, catalogue, uuid, version, instance_id)
 }

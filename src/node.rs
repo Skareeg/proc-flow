@@ -77,7 +77,7 @@ impl Pin {
             link_value: HashMap::new(),
             link_progress: HashMap::new(),
             value: None,
-            progress: 0.0
+            progress: 0.0,
         }
     }
     pub fn new_rs_basic(info: PinInfo) -> Self {
@@ -90,7 +90,7 @@ impl Pin {
             link_value: HashMap::new(),
             link_progress: HashMap::new(),
             value: None,
-            progress: 0.0
+            progress: 0.0,
         }
     }
 }
@@ -118,7 +118,7 @@ impl NodeInstanceInfo {
         Self {
             uuid: info.uuid.clone(),
             data: info.data.clone(),
-            graph: info.graph.clone()
+            graph: info.graph.clone(),
         }
     }
 }
@@ -154,9 +154,9 @@ impl Named for Node {
     }
 }
 
-/// 
+///
 /// Each possible command for a given node actor.
-/// 
+///
 #[derive(Serialize, Deserialize)]
 pub enum NodeCommand {
     /// Executes a node, creating the output values.
@@ -201,13 +201,19 @@ pub enum NodeCommand {
 
 use log::*;
 
-fn send_input_output(context: &Context, commander: Aid, output: uuid::Uuid, input: uuid::Uuid, datatype: String, msg: Message) {
+fn send_input_output(
+    context: &Context,
+    commander: Aid,
+    output: uuid::Uuid,
+    input: uuid::Uuid,
+    datatype: String,
+    msg: Message,
+) {
     match commander.send_new(NodeCommand::InputValue(context.aid.clone(), input.clone(), datatype.clone(), msg)) {
         Ok(()) => trace!("sent inputoutput from node actor {:?} to node actor {:?}, pin {:?} to pin {:?} with datatype {}", context.aid.clone(), commander.clone(), output.clone(), input.clone(), datatype.clone()),
         Err(e) => error!("unable to send inputoutput from node actor {:?} to node actor {:?}, pin {:?} to pin {:?} with datatype {}: {:?}", context.aid.clone(), commander.clone(), output.clone(), input.clone(), datatype.clone(), e)
     };
 }
-
 
 fn pin_vec_to_hashmap(pins: Vec<Pin>) -> std::collections::HashMap<uuid::Uuid, Pin> {
     let mut map = std::collections::HashMap::new();
@@ -221,7 +227,12 @@ fn pin_vec_to_hashmap(pins: Vec<Pin>) -> std::collections::HashMap<uuid::Uuid, P
 /// Implementation for a node.
 ///
 impl Node {
-    pub fn new(info: NodeInstanceInfo, process: Box<dyn Nodeable + Send + Sync>, catalogue: Arc<Mutex<Catalogue>>, controller: Aid) -> Self {
+    pub fn new(
+        info: NodeInstanceInfo,
+        process: Box<dyn Nodeable + Send + Sync>,
+        catalogue: Arc<Mutex<Catalogue>>,
+        controller: Aid,
+    ) -> Self {
         let cat = catalogue.lock().unwrap();
         let (vinputs, voutputs) = process.get_io(&cat);
         let (vreceives, vsends) = process.get_rs(&cat);
@@ -237,7 +248,7 @@ impl Node {
             sends,
             process: Arc::new(Mutex::new(process)),
             catalogue: catalogue.clone(),
-            controller
+            controller,
         }
     }
     ///
@@ -261,7 +272,7 @@ impl Node {
                                 output_info = output_pin.info.clone();
                                 output_uuid = output_pin.uuid;
                                 output_value = output_pin.value.clone();
-                            },
+                            }
                             // The pin does not exist. Return after logging an error.
                             None => {
                                 error!(
@@ -279,7 +290,14 @@ impl Node {
                         match output_value {
                             // Send the value already there, effectively caching it.
                             Some(output_value) => {
-                                send_input_output(&context, commander.clone(), output.clone(), input.clone(), output_info.datatype.clone(), output_value.clone());
+                                send_input_output(
+                                    &context,
+                                    commander.clone(),
+                                    output.clone(),
+                                    input.clone(),
+                                    output_info.datatype.clone(),
+                                    output_value.clone(),
+                                );
                             }
                             None => {
                                 let process = self.process.clone();
@@ -287,7 +305,7 @@ impl Node {
                                     &mut self,
                                     output_info.clone(),
                                     &context,
-                                    &parameter
+                                    &parameter,
                                 );
                                 match new_output_value {
                                     Ok(new_output_value) => {
@@ -306,51 +324,70 @@ impl Node {
                 // TODO: Add the reply for request of node value.
                 // This is a reply from a compute output request, setting the value of the input.
                 NodeCommand::InputValue(commander, input, datatype, message) => {
-                    let ipin: Option<&mut Pin> = self
-                        .inputs.get_mut(&input);
+                    let ipin: Option<&mut Pin> = self.inputs.get_mut(&input);
                     match ipin {
                         Some(ipin) => {
                             if &*ipin.info.datatype == &*datatype {
-                                ipin.value = (*message.content_as::<Option<Message>>().expect("input to node was not an optional message arc")).clone();
+                                ipin.value = (*message
+                                    .content_as::<Option<Message>>()
+                                    .expect("input to node was not an optional message arc"))
+                                .clone();
                             } else {
-                                error!("incorrect datatype sent from actor {:?} to actor {:?}: pin {}", commander, &context.aid, ipin.uuid);
+                                error!(
+                                    "incorrect datatype sent from actor {:?} to actor {:?}: pin {}",
+                                    commander, &context.aid, ipin.uuid
+                                );
                             }
                         }
                         None => error!(
                             "node actor {:?} does not have input pin with uuid of {}",
-                            &context.aid,
-                            input
+                            &context.aid, input
                         ),
                     };
                 }
                 NodeCommand::ReceiverMessage(_commander, sender, receiver, message) => {
                     let process = self.process.clone();
-                    process.lock().unwrap().handle_receive(
-                        &mut self,
-                        &sender,
-                        &receiver,
-                        &context,
-                        message,
-                    );
+                    process
+                        .lock()
+                        .unwrap()
+                        .handle_receive(&mut self, &sender, &receiver, &context, message);
                 }
                 NodeCommand::RequestProgress(requestor, output) => {
-                    let progress = self.outputs.get(&output.pin.unwrap()).unwrap().progress.clone();
-                    match requestor.send_new(NodeCommand::UpdateProgress(context.aid.clone(), output.clone(), progress.clone())) {
-                        Ok(()) => trace!("update progress ({}) sent from {:?} to {:?}", progress, &context.aid, requestor),
-                        Err(e) => error!("could not send update progress ({}) from {:?} to {:?}: {:?}", progress.clone(), &context.aid, requestor, e)
+                    let progress = self
+                        .outputs
+                        .get(&output.pin.unwrap())
+                        .unwrap()
+                        .progress
+                        .clone();
+                    match requestor.send_new(NodeCommand::UpdateProgress(
+                        context.aid.clone(),
+                        output.clone(),
+                        progress.clone(),
+                    )) {
+                        Ok(()) => trace!(
+                            "update progress ({}) sent from {:?} to {:?}",
+                            progress,
+                            &context.aid,
+                            requestor
+                        ),
+                        Err(e) => error!(
+                            "could not send update progress ({}) from {:?} to {:?}: {:?}",
+                            progress.clone(),
+                            &context.aid,
+                            requestor,
+                            e
+                        ),
                     };
                 }
                 NodeCommand::UpdateProgress(_progressor, output, progress) => {
-                    self.inputs
-                        .values_mut()
-                        .for_each(|input: &mut Pin| {
-                            if let Some(output) = input.link_progress.get_mut(&output.pin.unwrap()) {
-                                *output = *progress;
-                                let total_progress: f32 = input.link_progress.values().sum();
-                                let link_count = input.link_progress.len() as f32;
-                                input.progress = total_progress / link_count;
-                            }
-                        });
+                    self.inputs.values_mut().for_each(|input: &mut Pin| {
+                        if let Some(output) = input.link_progress.get_mut(&output.pin.unwrap()) {
+                            *output = *progress;
+                            let total_progress: f32 = input.link_progress.values().sum();
+                            let link_count = input.link_progress.len() as f32;
+                            input.progress = total_progress / link_count;
+                        }
+                    });
                 }
             };
         }

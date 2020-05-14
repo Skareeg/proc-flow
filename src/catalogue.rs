@@ -15,18 +15,26 @@ fn load_libraries() -> Vec<Library> {
             name: String::from("internal"),
             uuid: uuid::Uuid::parse_str("b0fa443c-20d0-4c2a-acf9-76c63af3cbed").unwrap(),
             author: String::from("Proc Flow Internal"),
-            format: 1
+            format: 1,
         },
         path: PathBuf::default(),
         graphs: std::collections::HashMap::new(),
     };
     for (info, versions) in super::nodes::register() {
-        internal.graphs.insert(info.uuid.clone(), LibraryGraphInfo {
-            info: info.clone(),
-            path: PathBuf::default(),
-            versions: versions.clone()
-        });
-        info!("added graph {} : {} with {} versions to internal library", info.uuid.clone(), info.name.clone(), versions.clone());
+        internal.graphs.insert(
+            info.uuid.clone(),
+            LibraryGraphInfo {
+                info: info.clone(),
+                path: PathBuf::default(),
+                versions: versions.clone(),
+            },
+        );
+        info!(
+            "added graph {} : {} with {} versions to internal library",
+            info.uuid.clone(),
+            info.name.clone(),
+            versions.clone()
+        );
     }
     info!("added internal libraries to catalogue");
     let mut applibs = match std::env::current_dir() {
@@ -88,7 +96,12 @@ impl Catalogue {
     pub fn get_graph_ref(&self, id: uuid::Uuid, version: u64) -> Option<GraphRef> {
         for lib in self.libraries.values() {
             if let Some(graph) = lib.graphs.get(&id) {
-                return Some(GraphRef {name: graph.info.name.clone(), uuid: graph.info.uuid, library: Some(lib.info.uuid), version});
+                return Some(GraphRef {
+                    name: graph.info.name.clone(),
+                    uuid: graph.info.uuid,
+                    library: Some(lib.info.uuid),
+                    version,
+                });
             };
         }
         None
@@ -96,7 +109,9 @@ impl Catalogue {
 
     pub fn get_graph_version(&self, graph_ref: &GraphRef) -> Option<VersionInfo> {
         for lib in self.libraries.values() {
-            if let Some(graph) = get_graph_version_from_library(&lib, graph_ref.uuid, graph_ref.version) {
+            if let Some(graph) =
+                get_graph_version_from_library(&lib, graph_ref.uuid, graph_ref.version)
+            {
                 return Some(graph.clone());
             };
         }
