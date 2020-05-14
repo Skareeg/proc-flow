@@ -21,15 +21,13 @@ pub struct Engine {
     pub system: ActorSystem,
     /// Mutable shared reference to the Catalogue.
     pub catalogue: Arc<Mutex<Catalogue>>,
-    /// Sending channel to request for things.
-    pub send: Sender<Message>,
+    /// Sending channel to send things.
+    pub send_to_controller: Sender<Message>,
     /// Recieving channel to get things back.
-    pub recv: Receiver<Message>,
+    pub recv_from_controller: Receiver<Message>,
     /// Controller node handle.
     pub controller: Aid,
 }
-
-use crate::graph::PinRef;
 
 impl Engine {
     ///
@@ -39,7 +37,8 @@ impl Engine {
         // Create engine state.
         let system = ActorSystem::create(ActorSystemConfig::default());
         let catalogue = Arc::new(Mutex::new(Catalogue::new()));
-        let (send, recv) = crossbeam::unbounded();
+        let (send_to_controller, recv_from_engine) = crossbeam::unbounded();
+        let (send_to_engine, recv_from_controller) = crossbeam::unbounded();
         let nodes = HashMap::new();
 
         catalogue.lock().unwrap().load_default_libraries();
@@ -47,8 +46,8 @@ impl Engine {
         // Create and spawn the controller.
         let controller_state = Controller {
             nodes,
-            sender: send.clone(),
-            receiver: recv.clone(),
+            send_to_engine,
+            recv_from_engine,
             catalogue: catalogue.clone(),
         };
         let controller = system
@@ -61,8 +60,8 @@ impl Engine {
         Self {
             system,
             catalogue,
-            send,
-            recv,
+            send_to_controller,
+            recv_from_controller,
             controller,
         }
     }
@@ -72,7 +71,7 @@ impl Engine {
             std::time::Duration::from_secs(5),
         );
         info!("Prepared to send a giveme5 request");
-        if let Some(num) = self.recv.recv().unwrap().content_as::<u64>() {
+        if let Some(num) = self.recv_from_controller.recv().unwrap().content_as::<u64>() {
             info!("Received the number {}", num);
         }
     }
@@ -85,10 +84,13 @@ impl Engine {
         let _ =
             self.controller
                 .send_new(ControllerCommand::BootGraph(id, version, instance_id, None));
-        if let Some(msg) = self.recv.recv().unwrap().content_as::<ControllerResponse>() {
+        if let Some(msg) = self.recv_from_controller.recv().unwrap().content_as::<ControllerResponse>() {
             match &*msg {
                 ControllerResponse::GraphBooted(_instance, actor) => {
                     return actor.clone();
+                }
+                _ => {
+                    error!("bad response on boot graph request");
                 }
             }
         }
@@ -97,8 +99,21 @@ impl Engine {
     pub fn boot_cluster(&mut self, _port: u64) {
         unimplemented!();
     }
-    pub fn get_output_pin_value(&mut self, node_actor: Aid, output: uuid::Uuid) -> Option<Message> {
-        unimplemented!();
+    pub fn set_input_pin_value(&mut self, node_actor: Aid, input: uuid::Uuid, value: Message) {
+    }
+    pub fn get_output_pin_value(&mut self, node_actor: Aid, output: uuid::Uuid, parameters: Option<Message>) -> Option<Message> {
+        self.controller.send_new(ControllerCommand::GetOutputPinValue(node_actor, output, parameters));
+        if let Some(msg) = self.recv_from_controller.recv().unwrap().content_as::<ControllerResponse>() {
+            match &*msg {
+                ControllerResponse::OutputValue(node_actor, output_pin, value) => {
+                    return value.clone();
+                }
+                _ => {
+                    error!("bad response on get output pin value request to controller");
+                }
+            }
+        };
+        None
     }
     pub fn wait(&mut self) {
         self.system.await_shutdown(None);
@@ -122,6 +137,14 @@ pub enum ControllerCommand {
     /// Sends a message to its target, including remote destinations.
     /// TODO: Actual cluster implementation.
     RouteMessage(Aid, Aid, Message),
+    /// Computes or gets and existing output pin's value.
+    /// First id is the node actor to grab from.
+    /// Second is the UUID of the pin to grab from.
+    /// Message is the arguments to the output pin.
+    GetOutputPinValue(Aid, uuid::Uuid, Option<Message>),
+    /// Initiates a reqeust reply poll.
+    /// Id is the id of the request itself.
+    REQREP(uuid::Uuid),
 }
 
 ///
@@ -131,6 +154,8 @@ pub enum ControllerCommand {
 pub enum ControllerResponse {
     /// Presents that a graph was booted correctly.
     GraphBooted(uuid::Uuid, Option<Aid>),
+    /// Presents a value from the pin of an output.
+    OutputValue(Aid, uuid::Uuid, Option<Message>),
 }
 
 ///
@@ -140,14 +165,15 @@ pub struct Controller {
     /// Map of root graph nodes that are active in the system.
     pub nodes: HashMap<uuid::Uuid, Aid>,
     /// TX to the Proc Flow engine structure.
-    pub sender: Sender<Message>,
-    /// RX from the Proc Flow engine structure.
-    pub receiver: Receiver<Message>,
+    pub send_to_engine: Sender<Message>,
+    /// TX to the Proc Flow engine structure.
+    pub recv_from_engine: Receiver<Message>,
     /// Reference to the node library.
     pub catalogue: Arc<Mutex<Catalogue>>,
 }
 
 use log::*;
+use crate::node::NodeReply;
 
 impl Controller {
     ///
@@ -157,7 +183,7 @@ impl Controller {
         if let Some(msg) = message.content_as::<ControllerCommand>() {
             match &*msg {
                 ControllerCommand::GiveMe5 => {
-                    let _ = self.sender.send(Message::new(5 as u64));
+                    let _ = self.send_to_engine.send(Message::new(5 as u64));
                 }
                 ControllerCommand::BootGraph(graph_id, version, instance_id, requestor) => {
                     info!(
@@ -214,7 +240,7 @@ impl Controller {
                                                         );
                                                     }
                                                     None => {
-                                                        let _ = self.sender.send(Message::new(
+                                                        let _ = self.send_to_engine.send(Message::new(
                                                             ControllerResponse::GraphBooted(
                                                                 instance_id.clone(),
                                                                 Some(actor),
@@ -235,7 +261,7 @@ impl Controller {
                                                         );
                                                     }
                                                     None => {
-                                                        let _ = self.sender.send(Message::new(
+                                                        let _ = self.send_to_engine.send(Message::new(
                                                             ControllerResponse::GraphBooted(
                                                                 instance_id.clone(),
                                                                 None,
@@ -258,7 +284,7 @@ impl Controller {
                                                 );
                                             }
                                             None => {
-                                                let _ = self.sender.send(Message::new(
+                                                let _ = self.send_to_engine.send(Message::new(
                                                     ControllerResponse::GraphBooted(
                                                         instance_id.clone(),
                                                         None,
@@ -301,7 +327,7 @@ impl Controller {
                                             );
                                         }
                                         None => {
-                                            let _ = self.sender.send(Message::new(
+                                            let _ = self.send_to_engine.send(Message::new(
                                                 ControllerResponse::GraphBooted(
                                                     instance_id.clone(),
                                                     None,
@@ -322,7 +348,7 @@ impl Controller {
                                     ));
                                 }
                                 None => {
-                                    let _ = self.sender.send(Message::new(
+                                    let _ = self.send_to_engine.send(Message::new(
                                         ControllerResponse::GraphBooted(instance_id.clone(), None),
                                     ));
                                 }
@@ -336,6 +362,18 @@ impl Controller {
                         Ok(()) => {}
                         Err(_e) => {}
                     }
+                }
+                ControllerCommand::GetOutputPinValue(node_actor, pin_id, parameters) => {
+                    let res = node_actor.send_new(crate::node::NodeCommand::ComputeOutput(context.aid, pin_id.clone(), parameters.clone()));
+                }
+                ControllerCommand::REQREP(id) => {
+                }
+            }
+        }
+        if let Some(msg) = message.content_as::<NodeReply>() {
+            match &*msg {
+                NodeReply::Value(node_actor, output_pin, value) => {
+                    self.send_to_engine.send(Message::new(ControllerResponse::OutputValue(node_actor.clone(), output_pin.clone(), value.clone())));
                 }
             }
         }
