@@ -99,20 +99,45 @@ impl Engine {
     pub fn boot_cluster(&mut self, _port: u64) {
         unimplemented!();
     }
-    pub fn set_input_pin_value(&mut self, node_actor: Aid, input: uuid::Uuid, value: Message) {
+    pub fn set_input_pin_value(&mut self, node_actor: Aid, input: uuid::Uuid, value: Option<Message>, datatype: String) {
+        info!("engine set input pin value");
+        match self.controller.send_new(ControllerCommand::SetInputPinValue(node_actor.clone(), input, value, datatype)) {
+            Ok(()) => {
+                if let Some(msg) = self.recv_from_controller.recv().unwrap().content_as::<ControllerResponse>() {
+                    match &*msg {
+                        ControllerResponse::InputPinSet => {
+                            return;
+                        }
+                        _ => {
+                            error!("bad response on get output pin value request to controller");
+                        }
+                    }
+                };
+            }
+            Err(e) => {
+                error!("could not send message to set input pin {:?} value on node actor {:?}: {}", input.clone(), node_actor.clone(), e.to_string());
+            }
+        }
     }
     pub fn get_output_pin_value(&mut self, node_actor: Aid, output: uuid::Uuid, parameters: Option<Message>) -> Option<Message> {
-        self.controller.send_new(ControllerCommand::GetOutputPinValue(node_actor, output, parameters));
-        if let Some(msg) = self.recv_from_controller.recv().unwrap().content_as::<ControllerResponse>() {
-            match &*msg {
-                ControllerResponse::OutputValue(node_actor, output_pin, value) => {
-                    return value.clone();
-                }
-                _ => {
-                    error!("bad response on get output pin value request to controller");
-                }
+        info!("engine get output pin value");
+        match self.controller.send_new(ControllerCommand::GetOutputPinValue(node_actor.clone(), output, parameters)) {
+            Ok(()) => {
+                if let Some(msg) = self.recv_from_controller.recv().unwrap().content_as::<ControllerResponse>() {
+                    match &*msg {
+                        ControllerResponse::OutputValue(_node_actor, value) => {
+                            return value.clone();
+                        }
+                        _ => {
+                            error!("bad response on get output pin value request to controller");
+                        }
+                    }
+                };
             }
-        };
+            Err(e) => {
+                error!("could not send message to get output pin {:?} value on node actor {:?}: {}", output.clone(), node_actor.clone(), e.to_string());
+            }
+        }
         None
     }
     pub fn wait(&mut self) {
@@ -142,6 +167,12 @@ pub enum ControllerCommand {
     /// Second is the UUID of the pin to grab from.
     /// Message is the arguments to the output pin.
     GetOutputPinValue(Aid, uuid::Uuid, Option<Message>),
+    /// Sets the value of a nodes input, 
+    /// First id is the node actor to grab from.
+    /// Second is the UUID of the pin to grab from.
+    /// Message is the arguments to the output pin.
+    /// String is the datatype of the message.
+    SetInputPinValue(Aid, uuid::Uuid, Option<Message>, String),
     /// Initiates a reqeust reply poll.
     /// Id is the id of the request itself.
     REQREP(uuid::Uuid),
@@ -155,7 +186,9 @@ pub enum ControllerResponse {
     /// Presents that a graph was booted correctly.
     GraphBooted(uuid::Uuid, Option<Aid>),
     /// Presents a value from the pin of an output.
-    OutputValue(Aid, uuid::Uuid, Option<Message>),
+    OutputValue(Aid, Option<Message>),
+    /// Presents that a pin's value was set sucessfully.
+    InputPinSet,
 }
 
 ///
@@ -173,7 +206,7 @@ pub struct Controller {
 }
 
 use log::*;
-use crate::node::NodeReply;
+use crate::node::NodeResponse;
 
 impl Controller {
     ///
@@ -226,6 +259,7 @@ impl Controller {
                                         match context
                                             .system
                                             .spawn()
+                                            .name(node.info.graph.name.clone())
                                             .with(node, crate::node::Node::handle)
                                         {
                                             Ok(actor) => {
@@ -310,6 +344,7 @@ impl Controller {
                                         graph_ref.name.clone(),
                                         version.clone()
                                     );
+                                    // TODO implement dynamic user graph booting, likely as a graph node.
                                 } else {
                                     error!(
                                         "graph {} : {} does not have version {} in catalogue",
@@ -363,17 +398,38 @@ impl Controller {
                         Err(_e) => {}
                     }
                 }
-                ControllerCommand::GetOutputPinValue(node_actor, pin_id, parameters) => {
-                    let res = node_actor.send_new(crate::node::NodeCommand::ComputeOutput(context.aid, pin_id.clone(), parameters.clone()));
+                ControllerCommand::SetInputPinValue(node_actor, pin_id, parameters, datatype) => {
+                    info!("controller set input pin value");
+                    match node_actor.send_new(crate::node::NodeCommand::InputValue(context.aid, pin_id.clone(), datatype.clone(), parameters.clone())) {
+                        Err(e) => error!("controller could not send command to node actor {} to set input of pin {}: {}", node_actor.clone(), pin_id.clone(), e.to_string()),
+                        _ => {}
+                    }
                 }
-                ControllerCommand::REQREP(id) => {
+                ControllerCommand::GetOutputPinValue(node_actor, pin_id, parameters) => {
+                    info!("controller get output pin value");
+                    match node_actor.send_new(crate::node::NodeCommand::ComputeOutput(context.aid, pin_id.clone(), parameters.clone())) {
+                        Err(e) => error!("controller could not send command to node actor {} to get output of pin {}: {}", node_actor.clone(), pin_id.clone(), e.to_string()),
+                        _ => {}
+                    }
+                }
+                // TODO: Remove?
+                ControllerCommand::REQREP(_id) => {
                 }
             }
         }
-        if let Some(msg) = message.content_as::<NodeReply>() {
+        if let Some(msg) = message.content_as::<NodeResponse>() {
             match &*msg {
-                NodeReply::Value(node_actor, output_pin, value) => {
-                    self.send_to_engine.send(Message::new(ControllerResponse::OutputValue(node_actor.clone(), output_pin.clone(), value.clone())));
+                NodeResponse::OutputPinValue(node_actor, output_pin, value) => {
+                    match self.send_to_engine.send(Message::new(ControllerResponse::OutputValue(node_actor.clone(), value.clone()))) {
+                        Err(e) => error!("controller could not send node actor {} pin {} value to engine channel: {}", node_actor.clone(), output_pin.clone(), e.to_string()),
+                        _ => {}
+                    }
+                }
+                NodeResponse::InputPinSet => {
+                    match self.send_to_engine.send(Message::new(ControllerResponse::InputPinSet)) {
+                        Err(e) => error!("controller could not input pin value set confirmation to engine channel: {}", e.to_string()),
+                        _ => {}
+                    }
                 }
             }
         }

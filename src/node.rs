@@ -1,5 +1,6 @@
 use crate::catalogue::*;
 use crate::graph::*;
+//use crate::engine::*;
 use axiom::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -160,13 +161,19 @@ impl Named for Node {
 #[derive(Serialize, Deserialize)]
 pub enum NodeCommand {
     /// Executes a node, creating the output values.
-    /// Will send progress back to caller.
+    /// Will send value back to caller pin.
     /// Aid is the commander.
     /// First id is the input pin.
     /// Second id is the output pin.
     /// String is the datatype to request.
     /// Optional message is a parameter or list of parameters to send to the output pin's function.
-    ComputeOutput(Aid, uuid::Uuid, uuid::Uuid, String, Option<Message>),
+    ComputeOutputToInput(Aid, uuid::Uuid, uuid::Uuid, String, Option<Message>),
+    /// Executes a node, creating the output values.
+    /// Will send value back to caller.
+    /// Aid is the commander.
+    /// Id is the output pin.
+    /// Optional message is a parameter or list of parameters to send to the output pin's function.
+    ComputeOutput(Aid, uuid::Uuid, Option<Message>),
     // /// Sends an output to another nodes input.
     // /// Aid is the sending node.
     // /// First pin is the input pin.
@@ -179,7 +186,7 @@ pub enum NodeCommand {
     /// Pin is the input pin.
     /// String is the datatype sent.
     /// The message is the value.
-    InputValue(Aid, uuid::Uuid, String, Message),
+    InputValue(Aid, uuid::Uuid, String, Option<Message>),
     /// Sends a message of some sort to a receiver.
     /// Aid is the sending node.
     /// First id is the sending pin.
@@ -199,7 +206,37 @@ pub enum NodeCommand {
     UpdateProgress(Aid, PinRef, f32),
 }
 
+///
+/// Each possible reply from a given node actor to a controller or external system.
+///
+#[derive(Serialize, Deserialize)]
+pub enum NodeResponse {
+    /// Sends an output to another actor.
+    /// Aid is the sending node.
+    /// Pin is the output pin.
+    /// The message is the value.
+    OutputPinValue(Aid, uuid::Uuid, Option<Message>),
+    /// Simple flag indicating that a pin input set command succeeded.
+    InputPinSet,
+}
+
 use log::*;
+
+fn compute_output_value(
+    node: &mut Node,
+    output_info: PinInfo,
+    context: &Context,
+    parameter: Option<Message>
+) -> Result<Option<Message>, String> {
+    let process = node.process.clone();
+    let new_value = process.lock().unwrap().compute_output(
+        node,
+        output_info.clone(),
+        &context,
+        &parameter,
+    );
+    new_value
+}
 
 fn send_input_output(
     context: &Context,
@@ -207,7 +244,7 @@ fn send_input_output(
     output: uuid::Uuid,
     input: uuid::Uuid,
     datatype: String,
-    msg: Message,
+    msg: Option<Message>,
 ) {
     match commander.send_new(NodeCommand::InputValue(context.aid.clone(), input.clone(), datatype.clone(), msg)) {
         Ok(()) => trace!("sent inputoutput from node actor {:?} to node actor {:?}, pin {:?} to pin {:?} with datatype {}", context.aid.clone(), commander.clone(), output.clone(), input.clone(), datatype.clone()),
@@ -218,7 +255,7 @@ fn send_input_output(
 fn pin_vec_to_hashmap(pins: Vec<Pin>) -> std::collections::HashMap<uuid::Uuid, Pin> {
     let mut map = std::collections::HashMap::new();
     for p in pins {
-        map.insert(p.uuid, p);
+        map.insert(p.info.uuid, p);
     }
     map
 }
@@ -258,7 +295,7 @@ impl Node {
         if let Some(msg) = message.content_as::<NodeCommand>() {
             match &*msg {
                 // This is a received request to process an output if needed and send them forward.
-                NodeCommand::ComputeOutput(commander, input, output, datatype, parameter) => {
+                NodeCommand::ComputeOutputToInput(commander, input, output, datatype, parameter) => {
                     // Gather the needed information prematurely, or the borrow checker will have a field day.
                     let output_info: PinInfo;
                     let output_uuid: uuid::Uuid;
@@ -296,22 +333,16 @@ impl Node {
                                     output.clone(),
                                     input.clone(),
                                     output_info.datatype.clone(),
-                                    output_value.clone(),
+                                    Some(output_value.clone()),
                                 );
                             }
                             None => {
-                                let process = self.process.clone();
-                                let new_output_value = process.lock().unwrap().compute_output(
-                                    &mut self,
-                                    output_info.clone(),
-                                    &context,
-                                    &parameter,
-                                );
+                                let new_output_value = compute_output_value(&mut self, output_info.clone(), &context, parameter.clone());
                                 match new_output_value {
                                     Ok(new_output_value) => {
                                         let output_pin = self.outputs.get_mut(&output).unwrap();
                                         output_pin.value = new_output_value.clone();
-                                        send_input_output(&context, commander.clone(), output.clone(), input.clone(), output_info.datatype.clone(), Message::new(new_output_value.clone()));
+                                        send_input_output(&context, commander.clone(), output.clone(), input.clone(), output_info.datatype.clone(), new_output_value.clone());
                                     },
                                     Err(e) => error!("could not calculate output value for node actor {:?} pin {} because of reason: {}", &context.aid, output, e)
                                 };
@@ -321,17 +352,72 @@ impl Node {
                         error!("incorrect requested datatype from node actor {:?} pin {} to node actor {:?} pin {}", &context.aid, output_uuid, &commander, input);
                     }
                 }
+                // This is a received request to process an output if needed and send them forward.
+                NodeCommand::ComputeOutput(commander, output, parameter) => {
+                    info!("node get output pin value");
+                    // Gather the needed information prematurely, or the borrow checker will have a field day.
+                    let output_info: PinInfo;
+                    let _output_uuid: uuid::Uuid;
+                    let output_value: Option<Message>;
+                    // Reference to self, and the pin as well, must go out of scope.
+                    {
+                        let output_pin = self.outputs.get_mut(&output);
+                        match output_pin {
+                            // The pin exists. Get the requried information.
+                            Some(output_pin) => {
+                                output_info = output_pin.info.clone();
+                                _output_uuid = output_pin.uuid;
+                                output_value = output_pin.value.clone();
+                            }
+                            // The pin does not exist. Return after logging an error.
+                            None => {
+                                error!(
+                                    "node actor {} does not have outpin pin with uuid of {}",
+                                    &context.aid, output
+                                );
+                                return Ok(Status::done(self));
+                            }
+                        }
+                    }
+                    // Is there already a value?
+                    // TODO: Make this a setting on node pins.
+                    match output_value {
+                        // Send the value already there, effectively caching it.
+                        Some(output_value) => {
+                            match commander.send_new(NodeResponse::OutputPinValue(context.aid.clone(), output.clone(), Some(output_value.clone()))) {
+                                Err(e) => error!("node actor {} could not send output for pin {} back to requestor after cache {}: {}", context.aid.clone(), output.clone(), commander.clone(), e.to_string()),
+                                _ => {}
+                            }
+                        }
+                        None => {
+                            let new_output_value = compute_output_value(&mut self, output_info.clone(), &context, parameter.clone());
+                            match new_output_value {
+                                Ok(new_output_value) => {
+                                    let output_pin = self.outputs.get_mut(&output).unwrap();
+                                    output_pin.value = new_output_value.clone();
+                                    match commander.send_new(NodeResponse::OutputPinValue(context.aid.clone(), output.clone(), new_output_value.clone())) {
+                                        Err(e) => error!("node actor {} could not send output for pin {} back to requestor after calculate {}: {}", context.aid.clone(), output.clone(), commander.clone(), e.to_string()),
+                                        _ => {}
+                                    }
+                                },
+                                Err(e) => error!("could not calculate output value for node actor {:?} pin {} because of reason: {}", &context.aid, output, e.to_string())
+                            };
+                        }
+                    }
+                }
                 // TODO: Add the reply for request of node value.
                 // This is a reply from a compute output request, setting the value of the input.
                 NodeCommand::InputValue(commander, input, datatype, message) => {
+                    info!("node set input pin value");
                     let ipin: Option<&mut Pin> = self.inputs.get_mut(&input);
                     match ipin {
                         Some(ipin) => {
                             if &*ipin.info.datatype == &*datatype {
-                                ipin.value = (*message
-                                    .content_as::<Option<Message>>()
-                                    .expect("input to node was not an optional message arc"))
-                                .clone();
+                                ipin.value = message.clone();
+                                if *commander == self.controller {
+                                    // TODO: Match and handle errors
+                                    let _ = commander.send_new(NodeResponse::InputPinSet);
+                                }
                             } else {
                                 error!(
                                     "incorrect datatype sent from actor {:?} to actor {:?}: pin {}",
@@ -390,6 +476,16 @@ impl Node {
                     });
                 }
             };
+        }
+        if let Some(msg) = message.content_as::<NodeResponse>() {
+            match &*msg {
+                NodeResponse::OutputPinValue(_responder, pin_id, _value) => {
+                    warn!("node actor {:?} has recieved a node response with the value of an output pin {:?} without corresponding input pin data", &context.aid, pin_id);
+                },
+                NodeResponse::InputPinSet => {
+                    warn!("node actor {:?} has recieved a node response indicating that a pin's value was set to something", &context.aid);
+                }
+            }
         }
         Ok(Status::done(self))
     }

@@ -8,6 +8,8 @@ use axiom::prelude::*;
 #[derive(Default)]
 pub struct NodeUtilLogV1 {}
 
+use log::*;
+
 impl Nodeable for NodeUtilLogV1 {
     fn get_io(&self, _catalogue: &Catalogue) -> (std::vec::Vec<Pin>, std::vec::Vec<Pin>) {
         let mut inputs = Vec::new();
@@ -106,6 +108,11 @@ impl Nodeable for NodeUtilLogV1 {
                             &uuid::Uuid::parse_str("5e6ab872-5cca-4e01-8dbb-2df843102dc0").unwrap(),
                         )
                         .expect("could not find corresponding log input");
+                    if let Some(value) = input.value.clone() {
+                        if let Some(value) = value.content_as::<String>() {
+                            info!("{}", value);
+                        }
+                    }
                     Ok(input.value.clone())
                 }
                 id_warn
@@ -119,6 +126,11 @@ impl Nodeable for NodeUtilLogV1 {
                             &uuid::Uuid::parse_str("2916bcb7-2943-4426-8af4-292bd8b1f417").unwrap(),
                         )
                         .expect("could not find corresponding log input");
+                    if let Some(value) = input.value.clone() {
+                        if let Some(value) = value.content_as::<String>() {
+                            warn!("{}", value);
+                        }
+                    }
                     Ok(input.value.clone())
                 }
                 id_error
@@ -132,6 +144,11 @@ impl Nodeable for NodeUtilLogV1 {
                             &uuid::Uuid::parse_str("f39a4e33-32f3-485f-b634-e539c98dbe94").unwrap(),
                         )
                         .expect("could not find corresponding log input");
+                    if let Some(value) = input.value.clone() {
+                        if let Some(value) = value.content_as::<String>() {
+                            error!("{}", value);
+                        }
+                    }
                     Ok(input.value.clone())
                 }
                 _ => panic!("could not find corresponding input uuid for log node"),
