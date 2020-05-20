@@ -344,7 +344,7 @@ impl Controller {
                                         graph_ref.name.clone(),
                                         version.clone()
                                     );
-                                    // TODO implement dynamic user graph booting, likely as a graph node.
+                                    // TODO Implement dynamic user graph booting, likely as a graph node.
                                 } else {
                                     error!(
                                         "graph {} : {} does not have version {} in catalogue",
