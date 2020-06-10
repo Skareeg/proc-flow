@@ -73,11 +73,15 @@ gltf = { version = "0.15.1", features = ["extras","names"] }
 cpal = "0.11.0"
 
 # Video
-wgpu = "0.4.0"
-shaderc = { version = "0.6.2", features = ["build-from-source"] }
-winit = "0.22.0"
+# Removing WGPU and shader-c dependency.
+# wgpu = "0.4.0"
+# shaderc = { version = "0.6.2", features = ["build-from-source"] }
+# winit = "0.22.0"
+# Prepping to add Amethyst game engine.
+# amethyst = "0.15.0"
 
 # UI
-conrod_core = "0.69.0"
-conrod_winit = "0.69.0"
-conrod_wgpu = "0.69.0"
+# Wait until needed.
+# conrod_core = "0.69.0"
+# conrod_winit = "0.69.0"
+# conrod_wgpu = "0.69.0"
