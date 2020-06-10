@@ -250,3 +250,18 @@ fn create_logo_texture(
 
     logo_tex
 }
+
+// CALL THE BANK
+
+// Test actor TCPClusterMgr one actor to another systems actor via Aid.
+
+// Create this entire canvas editor as a node that launches a window.
+// Takes initial graph location and version as input.
+// Blank input is a new blank graph version.
+// Outputs new graph location and version if changed.
+// Must read in graph version file and build an internal representation of the graph version graph.
+// Use conrod for shape drawing to vertex buffer.
+// Draw buffer via shader to render nodes to screen.
+// Keep track of camera location and zoom.
+// Accept input to move nodes, wire nodes together, and create and delete new nodes.
+// Spacebar searchbox for node instance creation. Box with text entry. Type brings button search results below. Assume latest version of graph.
