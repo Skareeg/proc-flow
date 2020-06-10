@@ -140,8 +140,8 @@ impl Engine {
         }
         None
     }
-    pub fn wait(&mut self) {
-        self.system.await_shutdown(None);
+    pub fn wait(&mut self, timeout: impl Into<Option<std::time::Duration>>) -> ShutdownResult {
+        self.system.trigger_and_await_shutdown(timeout)
     }
 }
 
