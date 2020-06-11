@@ -48,8 +48,6 @@ pub trait Nodeable {
 pub struct Pin {
     /// The general pin information in regards to the graph it comes from.
     pub info: PinInfo,
-    /// The id of this specific pin instance.
-    pub uuid: uuid::Uuid,
     /// Whether or not this particular output has been designated in the graph to cache its value.
     /// This defaults to true for both inputs and outputs.
     pub cache: bool,
@@ -71,7 +69,6 @@ impl Pin {
     pub fn new_io_basic(info: PinInfo) -> Self {
         Self {
             info,
-            uuid: uuid::Uuid::new_v4(),
             cache: true,
             link_nodes: HashMap::new(),
             link_pins: HashMap::new(),
@@ -84,7 +81,6 @@ impl Pin {
     pub fn new_rs_basic(info: PinInfo) -> Self {
         Self {
             info,
-            uuid: uuid::Uuid::new_v4(),
             cache: false,
             link_nodes: HashMap::new(),
             link_pins: HashMap::new(),
@@ -307,7 +303,7 @@ impl Node {
                             // The pin exists. Get the requried information.
                             Some(output_pin) => {
                                 output_info = output_pin.info.clone();
-                                output_uuid = output_pin.uuid;
+                                output_uuid = output_pin.info.uuid.clone();
                                 output_value = output_pin.value.clone();
                             }
                             // The pin does not exist. Return after logging an error.
@@ -357,7 +353,6 @@ impl Node {
                     info!("node get output pin value");
                     // Gather the needed information prematurely, or the borrow checker will have a field day.
                     let output_info: PinInfo;
-                    let _output_uuid: uuid::Uuid;
                     let output_value: Option<Message>;
                     // Reference to self, and the pin as well, must go out of scope.
                     {
@@ -366,7 +361,6 @@ impl Node {
                             // The pin exists. Get the requried information.
                             Some(output_pin) => {
                                 output_info = output_pin.info.clone();
-                                _output_uuid = output_pin.uuid;
                                 output_value = output_pin.value.clone();
                             }
                             // The pin does not exist. Return after logging an error.
@@ -421,7 +415,7 @@ impl Node {
                             } else {
                                 error!(
                                     "incorrect datatype sent from actor {:?} to actor {:?}: pin {}",
-                                    commander, &context.aid, ipin.uuid
+                                    commander, &context.aid, ipin.info.uuid
                                 );
                             }
                         }
