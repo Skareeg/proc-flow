@@ -209,6 +209,8 @@ pub enum NodeCommand {
     /// Aid is the requestor.
     /// String is the datum key.
     RemoveDatum(Aid, String),
+    /// Forces a node to refresh what pins are available on it.
+    RefreshPins(Aid),
 }
 
 ///
@@ -227,6 +229,8 @@ pub enum NodeResponse {
     DatumUpdated,
     /// Simple flag indicating that a data value was removed.
     DatumRemoved,
+    /// Simple flag indicating that a node has refreshed what pins are available.
+    PinsRefreshed,
 }
 
 use log::*;
@@ -490,6 +494,16 @@ impl Node {
                     self.info.data.remove(key);
                     let _ = requestor.send_new(NodeResponse::DatumRemoved);
                 }
+                NodeCommand::RefreshPins(requestor) => {
+                    let cat = self.catalogue.lock().unwrap();
+                    let (vinputs, voutputs) = self.process.lock().unwrap().get_io(&cat);
+                    let (vreceives, vsends) = self.process.lock().unwrap().get_rs(&cat);
+                    self.inputs = pin_vec_to_hashmap(vinputs);
+                    self.outputs = pin_vec_to_hashmap(voutputs);
+                    self.receives = pin_vec_to_hashmap(vreceives);
+                    self.sends = pin_vec_to_hashmap(vsends);
+                    let _ = requestor.send_new(NodeResponse::PinsRefreshed);
+                }
             };
         }
         if let Some(msg) = message.content_as::<NodeResponse>() {
@@ -501,10 +515,13 @@ impl Node {
                     warn!("bad logic: node actor {:?} has recieved a node response indicating that a pin's value was set to something", &context.aid);
                 }
                 NodeResponse::DatumUpdated => {
-                    warn!("bad logic: node actor {:?} has recieved a node response indicating that another nodes datum was created or updated", &context.aid);
+                    trace!("node actor {:?} has recieved a node response indicating that another nodes datum was created or updated", &context.aid);
                 }
                 NodeResponse::DatumRemoved => {
-                    warn!("bad logic: node actor {:?} has recieved a node response indicating that another nodes datum was removed", &context.aid);
+                    trace!("node actor {:?} has recieved a node response indicating that another nodes datum was removed", &context.aid);
+                }
+                NodeResponse::PinsRefreshed => {
+                    trace!("node actor {:?} has recieved a node response indicating that another nodes pins were removed", &context.aid);
                 }
             }
         }
