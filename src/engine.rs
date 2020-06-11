@@ -431,6 +431,7 @@ impl Controller {
                         _ => {}
                     }
                 }
+                _ => {}
             }
         }
         Ok(Status::done(self))
