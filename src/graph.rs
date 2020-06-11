@@ -67,6 +67,8 @@ pub struct Datum {
     pub value: serde_json::Value,
 }
 
+use std::collections::HashMap;
+
 ///
 /// Information for a given node.
 ///
@@ -80,7 +82,7 @@ pub struct NodeInfo {
     pub y: f32,
     /// Data variables used by the node to store data that is not held on any inputs, including large array data, matrix data, and a string or many strings pointing to relative file paths or not-recommended absolute file paths of data files.
     /// Basically just whatever the node needs to hold.
-    pub data: Option<Vec<Datum>>,
+    pub data: HashMap<String, serde_json::Value>,
     /// The reference to the graph that this node instance represents.
     pub graph: GraphRef,
 }

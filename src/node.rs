@@ -105,7 +105,7 @@ pub struct NodeInstanceInfo {
     pub uuid: uuid::Uuid,
     /// Data variables used by the node to store data that is not held on any inputs, including large array data, matrix data, and a string or many strings pointing to relative file paths or not-recommended absolute file paths of data files.
     /// Basically just whatever the node needs to hold.
-    pub data: Option<Vec<Datum>>,
+    pub data: HashMap<String, serde_json::Value>,
     /// The reference to the graph that this node instance represents.
     pub graph: GraphRef,
 }
@@ -200,6 +200,15 @@ pub enum NodeCommand {
     /// Pin is the output whose progress is updating.
     /// Float is the progress.
     UpdateProgress(Aid, PinRef, f32),
+    /// Creates or updates an internal data value within a node.
+    /// Aid is the requestor.
+    /// String is the datum key.
+    /// The message is the value.
+    UpdateDatum(Aid, String, serde_json::Value),
+    /// Removes an internal data value wihtin a node.
+    /// Aid is the requestor.
+    /// String is the datum key.
+    RemoveDatum(Aid, String),
 }
 
 ///
@@ -214,6 +223,10 @@ pub enum NodeResponse {
     OutputPinValue(Aid, uuid::Uuid, Option<Message>),
     /// Simple flag indicating that a pin input set command succeeded.
     InputPinSet,
+    /// Simple flag indicating that a data value was created or updated.
+    DatumUpdated,
+    /// Simple flag indicating that a data value was removed.
+    DatumRemoved,
 }
 
 use log::*;
@@ -469,15 +482,29 @@ impl Node {
                         }
                     });
                 }
+                NodeCommand::UpdateDatum(requestor, key, value) => {
+                    self.info.data.insert(key.clone(), value.clone());
+                    let _ = requestor.send_new(NodeResponse::DatumUpdated);
+                }
+                NodeCommand::RemoveDatum(requestor, key) => {
+                    self.info.data.remove(key);
+                    let _ = requestor.send_new(NodeResponse::DatumRemoved);
+                }
             };
         }
         if let Some(msg) = message.content_as::<NodeResponse>() {
             match &*msg {
                 NodeResponse::OutputPinValue(_responder, pin_id, _value) => {
-                    warn!("node actor {:?} has recieved a node response with the value of an output pin {:?} without corresponding input pin data", &context.aid, pin_id);
-                },
+                    warn!("bad logic: node actor {:?} has recieved a node response with the value of an output pin {:?} without corresponding input pin data", &context.aid, pin_id);
+                }
                 NodeResponse::InputPinSet => {
-                    warn!("node actor {:?} has recieved a node response indicating that a pin's value was set to something", &context.aid);
+                    warn!("bad logic: node actor {:?} has recieved a node response indicating that a pin's value was set to something", &context.aid);
+                }
+                NodeResponse::DatumUpdated => {
+                    warn!("bad logic: node actor {:?} has recieved a node response indicating that another nodes datum was created or updated", &context.aid);
+                }
+                NodeResponse::DatumRemoved => {
+                    warn!("bad logic: node actor {:?} has recieved a node response indicating that another nodes datum was removed", &context.aid);
                 }
             }
         }

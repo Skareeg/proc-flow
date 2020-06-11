@@ -176,7 +176,7 @@ impl NodeUtilLogV1 {
         Node::new(
             NodeInstanceInfo {
                 uuid: instance_id,
-                data: None,
+                data: std::collections::HashMap::new(),
                 graph: GraphRef {
                     name: String::from("Log"),
                     uuid: uuid::Uuid::parse_str("fd41d8ef-d10f-4499-8a90-35b73d8ff246").unwrap(),
