@@ -35,10 +35,9 @@ pub trait Nodeable {
     fn handle_receive(
         &mut self,
         node: &mut Node,
-        sender: &PinRef,
-        receiver: &PinRef,
         context: &Context,
-        message: &Message,
+        receiver: &uuid::Uuid,
+        message: &Option<Message>,
     );
 }
 
@@ -188,7 +187,7 @@ pub enum NodeCommand {
     /// First id is the sending pin.
     /// Second id is the receiving pin.
     /// The dynamic is the message.
-    ReceiverMessage(Aid, PinRef, PinRef, Message),
+    ReceiverMessage(Aid, uuid::Uuid, Option<Message>),
     /// Requests the progress of a node.
     /// These are primarily sent by external actors, or the graph editor actor.
     /// Aid is the requestor.
@@ -225,6 +224,8 @@ pub enum NodeResponse {
     OutputPinValue(Aid, uuid::Uuid, Option<Message>),
     /// Simple flag indicating that a pin input set command succeeded.
     InputPinSet,
+    /// Simple flag indicating that a value was sent to a receiver.
+    Received,
     /// Simple flag indicating that a data value was created or updated.
     DatumUpdated,
     /// Simple flag indicating that a data value was removed.
@@ -442,12 +443,13 @@ impl Node {
                         ),
                     };
                 }
-                NodeCommand::ReceiverMessage(_commander, sender, receiver, message) => {
+                NodeCommand::ReceiverMessage(commander, receiver, message) => {
                     let process = self.process.clone();
                     process
                         .lock()
                         .unwrap()
-                        .handle_receive(&mut self, &sender, &receiver, &context, message);
+                        .handle_receive(&mut self, &context, &receiver, &message);
+                    let _ = commander.send_new(NodeResponse::Received);
                 }
                 NodeCommand::RequestProgress(requestor, output) => {
                     let progress = self
@@ -513,6 +515,9 @@ impl Node {
                 }
                 NodeResponse::InputPinSet => {
                     warn!("bad logic: node actor {:?} has recieved a node response indicating that a pin's value was set to something", &context.aid);
+                }
+                NodeResponse::Received => {
+                    trace!("node actor {:?} has recieved a node response indicating that a value was successfully sent", &context.aid);
                 }
                 NodeResponse::DatumUpdated => {
                     trace!("node actor {:?} has recieved a node response indicating that another nodes datum was created or updated", &context.aid);

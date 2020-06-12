@@ -159,10 +159,9 @@ impl Nodeable for NodeUtilLogV1 {
     fn handle_receive(
         &mut self,
         _node: &mut Node,
-        _sender: &PinRef,
-        _receiver: &PinRef,
         _context: &Context,
-        _message: &Message,
+        _receiver: &uuid::Uuid,
+        _message: &Option<Message>,
     ) {
         todo!()
     }

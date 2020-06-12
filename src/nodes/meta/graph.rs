@@ -63,10 +63,9 @@ impl Nodeable for NodeMetaGraphV1 {
     fn handle_receive(
         &mut self,
         _node: &mut Node,
-        _sender: &PinRef,
-        _receiver: &PinRef,
         _context: &Context,
-        _message: &axiom::message::Message,
+        _receiver: &uuid::Uuid,
+        _message: &Option<axiom::message::Message>,
     ) {
         todo!()
     }

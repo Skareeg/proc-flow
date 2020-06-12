@@ -140,6 +140,26 @@ impl Engine {
         }
         None
     }
+    pub fn send_value(&mut self, node_actor: Aid, receiver: uuid::Uuid, value: Option<Message>) {
+        info!("engine send value");
+        match self.controller.send_new(ControllerCommand::SendValue(node_actor.clone(), receiver.clone(), value)) {
+            Ok(()) => {
+                if let Some(msg) = self.recv_from_controller.recv().unwrap().content_as::<ControllerResponse>() {
+                    match &*msg {
+                        ControllerResponse::ValueSent => {
+                            info!("engine value sent")
+                        }
+                        _ => {
+                            error!("bad response on send value request to controller");
+                        }
+                    }
+                };
+            }
+            Err(e) => {
+                error!("could not send message to set receiver pin {:?} on node actor {:?}: {}", receiver.clone(), node_actor.clone(), e.to_string());
+            }
+        }
+    }
     pub fn wait(&mut self, timeout: impl Into<Option<std::time::Duration>>) -> ShutdownResult {
         self.system.trigger_and_await_shutdown(timeout)
     }
@@ -167,12 +187,17 @@ pub enum ControllerCommand {
     /// Second is the UUID of the pin to grab from.
     /// Message is the arguments to the output pin.
     GetOutputPinValue(Aid, uuid::Uuid, Option<Message>),
-    /// Sets the value of a nodes input, 
-    /// First id is the node actor to grab from.
-    /// Second is the UUID of the pin to grab from.
+    /// Sets the value of a nodes input.
+    /// First id is the node actor to set.
+    /// Second is the UUID of the pin to set.
     /// Message is the arguments to the output pin.
     /// String is the datatype of the message.
     SetInputPinValue(Aid, uuid::Uuid, Option<Message>, String),
+    /// Sends a value to a nodes receiver pins. 
+    /// First id is the node actor to send to.
+    /// Second is the UUID of the pin to send to.
+    /// Message is the message to send.
+    SendValue(Aid, uuid::Uuid, Option<Message>),
     /// Initiates a reqeust reply poll.
     /// Id is the id of the request itself.
     REQREP(uuid::Uuid),
@@ -189,6 +214,8 @@ pub enum ControllerResponse {
     OutputValue(Aid, Option<Message>),
     /// Presents that a pin's value was set sucessfully.
     InputPinSet,
+    /// TODO Proper comment here.
+    ValueSent,
 }
 
 ///
@@ -412,6 +439,13 @@ impl Controller {
                         _ => {}
                     }
                 }
+                ControllerCommand::SendValue(node_actor, pin_id, parameters) => {
+                    info!("controller send value");
+                    match node_actor.send_new(crate::node::NodeCommand::ReceiverMessage(context.aid, pin_id.clone(), parameters.clone())) {
+                        Err(e) => error!("controller could not send command to node actor {} to send value to receiver pin {}: {}", node_actor.clone(), pin_id.clone(), e.to_string()),
+                        _ => {}
+                    }
+                }
                 // TODO: Remove?
                 ControllerCommand::REQREP(_id) => {
                 }
@@ -427,7 +461,13 @@ impl Controller {
                 }
                 NodeResponse::InputPinSet => {
                     match self.send_to_engine.send(Message::new(ControllerResponse::InputPinSet)) {
-                        Err(e) => error!("controller could not input pin value set confirmation to engine channel: {}", e.to_string()),
+                        Err(e) => error!("controller could not get input pin value set confirmation to engine channel: {}", e.to_string()),
+                        _ => {}
+                    }
+                }
+                NodeResponse::Received => {
+                    match self.send_to_engine.send(Message::new(ControllerResponse::ValueSent)) {
+                        Err(e) => error!("controller could not get send value confirmation to engine channel: {}", e.to_string()),
                         _ => {}
                     }
                 }

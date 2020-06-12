@@ -1,2 +1,2 @@
-// pub mod canvas;
+pub mod canvas;
 pub mod graph;
