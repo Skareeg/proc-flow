@@ -25,7 +25,9 @@ use amethyst::{
         shape::Shape,
         types::DefaultBackend,
         Mesh, RenderingBundle,
+        debug_drawing::*,
     },
+    ui::{RenderUi, ToNativeWidget, UiBundle, UiCreator, UiTransformData, UiWidget},
     utils::application_root_dir,
     window::{ScreenDimensions, DisplayConfig},
     Application, GameData, GameDataBuilder, SimpleState, StateData,
@@ -56,10 +58,19 @@ pub struct NodeMetaCanvasV1 {
 use axiom::prelude::*;
 use log::*;
 
+use std::sync::*;
+
+use super::camera;
+use super::nodes;
+
 struct MyState;
 
 impl SimpleState for MyState {
     fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
+        let start_width: f64 = 640.0;
+        let start_height: f64 = 480.0;
+        let mut ui = Arc::new(Mutex::new(conrod_core::UiBuilder::new([start_width, start_height]).build()));
+        data.world.insert(ui);
     }
 }
 
@@ -138,15 +149,16 @@ impl Nodeable for NodeMetaCanvasV1 {
                 display_config.resizable = true;
             
                 let game_data = GameDataBuilder::default()
-                    .with_bundle(
+                .with_bundle(TransformBundle::new()).expect("could not create Amethyst game data")
+                .with_bundle(
                         RenderingBundle::<DefaultBackend>::new()
                             .with_plugin(
                                 RenderToWindow::from_config(display_config)
                                     .with_clear([0.34, 0.36, 0.52, 1.0]),
                             )
-                            .with_plugin(RenderPbr3D::default()),
-                    ).expect("could not create rendering bundle")
-                    .with_bundle(TransformBundle::new()).expect("could not create Amethyst game data");
+                            //.with_plugin(RenderPbr3D::default()),
+                            .with_plugin(RenderUi::default()),
+                    ).expect("could not create rendering bundle");
             
                 let mut game = Application::new(assets_dir, MyState, game_data).expect("could not create the Amethyst application structure");
                 game.run();
