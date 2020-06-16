@@ -74,10 +74,11 @@ cpal = "0.11.0"
 
 # Video
 amethyst = "0.15.0"
+lyon = "0.15.8"
 
 # UI
 # Wait until needed.
-# conrod_core = "0.69.0"
+conrod_core = "0.70.0"
 # conrod_winit = "0.69.0"
 # conrod_wgpu = "0.69.0"
 
