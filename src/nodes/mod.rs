@@ -8,6 +8,7 @@ use crate::graph::*;
 /// Registers the internal nodes as available graphs to a catalogue.
 pub fn register() -> Vec<(GraphInfo, u64)> {
     let mut nodes = Vec::new();
+    nodes.append(&mut meta::register());
     nodes.append(&mut util::register());
     nodes
 }
@@ -25,5 +26,7 @@ pub fn create(
     version: u64,
     instance_id: uuid::Uuid,
 ) -> Option<Node> {
-    util::create(controller, catalogue, uuid, version, instance_id)
+    None
+    .or(meta::create(controller.clone(), catalogue.clone(), uuid, version, instance_id))
+    .or(util::create(controller.clone(), catalogue.clone(), uuid, version, instance_id))
 }
