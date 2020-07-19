@@ -39,6 +39,13 @@ pub trait Nodeable {
         receiver: &uuid::Uuid,
         message: &Option<Message>,
     );
+    /// Reacts to an arbitrary message.
+    fn handle_message(
+        &mut self,
+        node: &mut Node,
+        context: &Context,
+        message: &Message,
+    ){}
 }
 
 ///
@@ -508,7 +515,7 @@ impl Node {
                 }
             };
         }
-        if let Some(msg) = message.content_as::<NodeResponse>() {
+        else if let Some(msg) = message.content_as::<NodeResponse>() {
             match &*msg {
                 NodeResponse::OutputPinValue(_responder, pin_id, _value) => {
                     warn!("bad logic: node actor {:?} has recieved a node response with the value of an output pin {:?} without corresponding input pin data", &context.aid, pin_id);
@@ -529,6 +536,13 @@ impl Node {
                     trace!("node actor {:?} has recieved a node response indicating that another nodes pins were removed", &context.aid);
                 }
             }
+        }
+        else {
+            let process = self.process.clone();
+            process
+                .lock()
+                .unwrap()
+                .handle_message(&mut self, &context, &message);
         }
         Ok(Status::done(self))
     }
