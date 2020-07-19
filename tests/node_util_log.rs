@@ -10,7 +10,7 @@ fn calculates_output() {
     match log_actor {
         Some(log_actor) => {
             engine.set_input_pin_value(log_actor.clone(), log_info_input_pin_id, Some(axiom::prelude::Message::new("testing log actor".to_owned())), "string".to_owned());
-            let value = engine.get_output_pin_value(log_actor.clone(), log_info_output_pin_id, None);
+            let value = engine.compute_output_pin_value(log_actor.clone(), log_info_output_pin_id, None);
             match value {
                 Some(value) => {
                     match value.content_as::<String>() {

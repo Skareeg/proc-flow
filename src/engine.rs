@@ -119,9 +119,9 @@ impl Engine {
             }
         }
     }
-    pub fn get_output_pin_value(&mut self, node_actor: Aid, output: uuid::Uuid, parameters: Option<Message>) -> Option<Message> {
+    pub fn compute_output_pin_value(&mut self, node_actor: Aid, output: uuid::Uuid, parameters: Option<Message>) -> Option<Message> {
         info!("engine get output pin value");
-        match self.controller.send_new(ControllerCommand::GetOutputPinValue(node_actor.clone(), output, parameters)) {
+        match self.controller.send_new(ControllerCommand::ComputeOutputPinValue(node_actor.clone(), output, parameters)) {
             Ok(()) => {
                 if let Some(msg) = self.recv_from_controller.recv().unwrap().content_as::<ControllerResponse>() {
                     match &*msg {
@@ -186,7 +186,7 @@ pub enum ControllerCommand {
     /// First id is the node actor to grab from.
     /// Second is the UUID of the pin to grab from.
     /// Message is the arguments to the output pin.
-    GetOutputPinValue(Aid, uuid::Uuid, Option<Message>),
+    ComputeOutputPinValue(Aid, uuid::Uuid, Option<Message>),
     /// Sets the value of a nodes input.
     /// First id is the node actor to set.
     /// Second is the UUID of the pin to set.
@@ -432,7 +432,8 @@ impl Controller {
                         _ => {}
                     }
                 }
-                ControllerCommand::GetOutputPinValue(node_actor, pin_id, parameters) => {
+                ControllerCommand::ComputeOutputPinValue(node_actor, pin_id, parameters) => {
+                    // TODO! Determine getting an output should block! Make both versions? Poll returns current output. Compute computes it!
                     info!("controller get output pin value");
                     match node_actor.send_new(crate::node::NodeCommand::ComputeOutput(context.aid, pin_id.clone(), parameters.clone())) {
                         Err(e) => error!("controller could not send command to node actor {} to get output of pin {}: {}", node_actor.clone(), pin_id.clone(), e.to_string()),

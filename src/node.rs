@@ -401,7 +401,7 @@ impl Node {
                     // Is there already a value?
                     // TODO: Make this a setting on node pins.
                     match output_value {
-                        // Send the value already there, effectively caching it.
+                        // Send the value already there, effectively acting as a cached value.
                         Some(output_value) => {
                             match commander.send_new(NodeResponse::OutputPinValue(context.aid.clone(), output.clone(), Some(output_value.clone()))) {
                                 Err(e) => error!("node actor {} could not send output for pin {} back to requestor after cache {}: {}", context.aid.clone(), output.clone(), commander.clone(), e.to_string()),
@@ -451,12 +451,12 @@ impl Node {
                     };
                 }
                 NodeCommand::ReceiverMessage(commander, receiver, message) => {
+                    let _ = commander.send_new(NodeResponse::Received);
                     let process = self.process.clone();
                     process
                         .lock()
                         .unwrap()
                         .handle_receive(&mut self, &context, &receiver, &message);
-                    let _ = commander.send_new(NodeResponse::Received);
                 }
                 NodeCommand::RequestProgress(requestor, output) => {
                     let progress = self
