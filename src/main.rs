@@ -34,6 +34,7 @@ fn main() {
         }
         None => panic!("did not get aid back from engine boot of canvas node"),
     };
+    engine.wait(None);
 
     info!("Hello, world!");
 }
