@@ -217,6 +217,8 @@ pub enum NodeCommand {
     RemoveDatum(Aid, String),
     /// Forces a node to refresh what pins are available on it.
     RefreshPins(Aid),
+    /// Tells the node to tell the controller to tell the engine to stop waiting.
+    StopWaitingForNewMessages,
 }
 
 ///
@@ -512,6 +514,9 @@ impl Node {
                     self.receives = pin_vec_to_hashmap(vreceives);
                     self.sends = pin_vec_to_hashmap(vsends);
                     let _ = requestor.send_new(NodeResponse::PinsRefreshed);
+                }
+                NodeCommand::StopWaitingForNewMessages => {
+                    let _ = self.controller.send_new(super::engine::ControllerCommand::StopWaitingForNewMessages);
                 }
             };
         }

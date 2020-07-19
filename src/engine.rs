@@ -223,6 +223,8 @@ pub enum ControllerCommand {
     /// Second is the UUID of the pin to send to.
     /// Message is the message to send.
     SendValue(Aid, uuid::Uuid, Option<Message>),
+    /// Tells the engine that nodes are fine with being shutdown and that no new messages need to be processed.
+    StopWaitingForNewMessages,
     /// Initiates a reqeust reply poll.
     /// Id is the id of the request itself.
     /// TODO: Is this needed?
@@ -242,8 +244,6 @@ pub enum ControllerResponse {
     InputPinSet,
     /// TODO Proper comment here.
     ValueSent,
-    /// Tells the engine that nodes are fine with being shutdown, as told by one of the nodes themselves.
-    CanShutdown,
 }
 
 ///
@@ -476,6 +476,9 @@ impl Controller {
                         Err(e) => error!("controller could not send command to node actor {} to send value to receiver pin {}: {}", node_actor.clone(), pin_id.clone(), e.to_string()),
                         _ => {}
                     }
+                }
+                ControllerCommand::StopWaitingForNewMessages => {
+                    *(self.keep_waiting.lock().unwrap()) = false;
                 }
                 // TODO: Remove?
                 ControllerCommand::REQREP(_id) => {
