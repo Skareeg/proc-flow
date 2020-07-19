@@ -27,6 +27,8 @@ pub struct Engine {
     pub recv_from_controller: Receiver<Message>,
     /// Controller node handle.
     pub controller: Aid,
+    /// Controls whether or not this engine should keep waiting for new messages.
+    pub keep_waiting: Arc<Mutex<bool>>,
 }
 
 impl Engine {
@@ -43,12 +45,15 @@ impl Engine {
 
         catalogue.lock().unwrap().load_default_libraries();
 
+        let keep_waiting = Arc::new(Mutex::new(true));
+
         // Create and spawn the controller.
         let controller_state = Controller {
             nodes,
             send_to_engine,
             recv_from_engine,
             catalogue: catalogue.clone(),
+            keep_waiting: keep_waiting.clone(),
         };
         let controller = system
             .spawn()
@@ -63,6 +68,7 @@ impl Engine {
             send_to_controller,
             recv_from_controller,
             controller,
+            keep_waiting,
         }
     }
     pub fn test_5(&mut self) {
@@ -160,8 +166,27 @@ impl Engine {
             }
         }
     }
+    /// Tells the engine that it can stop waiting for new messages.
+    pub fn stop_waiting(&mut self) {
+        *(self.keep_waiting.lock().unwrap()) = false;
+    }
+    /// Will wait until the nodes are done processing.
+    /// If a timeout is specified, the function will return the ShutdownResult.
+    /// If a timeout is not specificed, the function will keep polling the function until the engine is told to stop waiting, when it will then return the last ShutdownResult.
     pub fn wait(&mut self, timeout: impl Into<Option<std::time::Duration>>) -> ShutdownResult {
-        self.system.trigger_and_await_shutdown(timeout)
+        let timeout = timeout.into();
+        match timeout {
+            None => {
+                let mut res = self.system.trigger_and_await_shutdown(None);
+                while *(self.keep_waiting.lock().unwrap()) && res != ShutdownResult::Panicked {
+                    res = self.system.trigger_and_await_shutdown(None);
+                }
+                res
+            }
+            _ => {
+                self.system.trigger_and_await_shutdown(timeout)
+            }
+        }
     }
 }
 
@@ -200,6 +225,7 @@ pub enum ControllerCommand {
     SendValue(Aid, uuid::Uuid, Option<Message>),
     /// Initiates a reqeust reply poll.
     /// Id is the id of the request itself.
+    /// TODO: Is this needed?
     REQREP(uuid::Uuid),
 }
 
@@ -216,6 +242,8 @@ pub enum ControllerResponse {
     InputPinSet,
     /// TODO Proper comment here.
     ValueSent,
+    /// Tells the engine that nodes are fine with being shutdown, as told by one of the nodes themselves.
+    CanShutdown,
 }
 
 ///
@@ -230,6 +258,8 @@ pub struct Controller {
     pub recv_from_engine: Receiver<Message>,
     /// Reference to the node library.
     pub catalogue: Arc<Mutex<Catalogue>>,
+    /// Controls whether or not the engine is still running.
+    pub keep_waiting: Arc<Mutex<bool>>,
 }
 
 use log::*;
