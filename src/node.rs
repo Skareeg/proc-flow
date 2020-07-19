@@ -42,9 +42,9 @@ pub trait Nodeable {
     /// Reacts to an arbitrary message.
     fn handle_message(
         &mut self,
-        node: &mut Node,
-        context: &Context,
-        message: &Message,
+        _node: &mut Node,
+        _context: &Context,
+        _message: &Message,
     ){}
 }
 
