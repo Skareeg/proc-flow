@@ -225,10 +225,6 @@ pub enum ControllerCommand {
     SendValue(Aid, uuid::Uuid, Option<Message>),
     /// Tells the engine that nodes are fine with being shutdown and that no new messages need to be processed.
     StopWaitingForNewMessages,
-    /// Initiates a reqeust reply poll.
-    /// Id is the id of the request itself.
-    /// TODO: Is this needed?
-    REQREP(uuid::Uuid),
 }
 
 ///
@@ -479,9 +475,6 @@ impl Controller {
                 }
                 ControllerCommand::StopWaitingForNewMessages => {
                     *(self.keep_waiting.lock().unwrap()) = false;
-                }
-                // TODO: Remove?
-                ControllerCommand::REQREP(_id) => {
                 }
             }
         }
