@@ -1,4 +1,4 @@
-use iced_winit::winit;
+use iced_winit::{winit, Color};
 
 use winit::{
     event::{Event, WindowEvent},
@@ -9,14 +9,24 @@ use winit::{
 // For the ability to launch on a separate thread.
 use winit::platform::windows::EventLoopExtWindows;
 
+// For the ability to return from the event loop on Exit.
+use winit::platform::desktop::EventLoopExtDesktop;
+
 use iced_native::{UserInterface, Cache, Size, Clipboard, MouseCursor};
 use iced_wgpu::Renderer;
 use iced_wgpu::wgpu;
 
 use futures::executor::block_on;
+use crossbeam::{Receiver, Sender};
 
-pub fn run_canvas_editor() {
-    let event_loop = EventLoop::<()>::new_any_thread();
+use super::canvas::CanvasMessage;
+
+use axiom::prelude::*;
+
+use log::*;
+
+pub fn run_canvas_editor(node: Aid, recv_from_editor_actor: Receiver<CanvasMessage>) {
+    let mut event_loop = EventLoop::<()>::new_any_thread();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
     let mut logical_size = window.inner_size().to_logical::<f64>(window.scale_factor());
     let mut modifiers = winit::event::ModifiersState::default();
@@ -44,16 +54,22 @@ pub fn run_canvas_editor() {
     };
     let mut resized = false;
 
+    let scene = Scene::new(&mut device);
+
     let mut events = Vec::new();
     let mut cache = Some(Cache::new());
     let mut renderer = Renderer::new(&mut device, iced_wgpu::Settings::default());
     let mut output = (iced_wgpu::Primitive::None, MouseCursor::OutOfBounds);
 
+    // let mut state = program::State::new(
+    //     control
+    // );
+
     // Create GUI elements here.
 
-    event_loop.run(move |event, _, control_flow| {
+    event_loop.run_return(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
-
+        
         match event {
             Event::WindowEvent {event, ..} => {
                 match event {
@@ -65,7 +81,7 @@ pub fn run_canvas_editor() {
                         resized = true;
                     }
                     WindowEvent::CloseRequested => {
-                        *control_flow = ControlFlow::Exit
+                        *control_flow = ControlFlow::Exit;
                     }
                     _ => {}
                 }
@@ -96,6 +112,10 @@ pub fn run_canvas_editor() {
                     &wgpu::CommandEncoderDescriptor { todo: 0 },
                 );
 
+                {
+                    let mut render_pass = scene.clear(&frame.view, &mut encoder, Color::from_rgb(0.0, 0.2, 0.0));
+                }
+
                 let mouse_cursor = renderer.draw(&mut device, &mut encoder, iced_wgpu::Target { texture: &frame.view, viewport }, &output, window.scale_factor(), &["Some debug information!"]);
 
                 queue.submit(&[encoder.finish()]);
@@ -105,7 +125,13 @@ pub fn run_canvas_editor() {
             _ => {}
         }
     });
+    
+    let _ = node.send_new(CanvasMessage::Exit);
 }
+
+// Code taken from https://github.com/hecrj/iced/blob/master/examples/integration/src/scene.rs
+// Credits to Iced team: https://github.com/hecrj/iced
+// License MIT at https://github.com/hecrj/iced/blob/master/LICENSE
 
 pub struct Scene {
     pipeline: wgpu::RenderPipeline,

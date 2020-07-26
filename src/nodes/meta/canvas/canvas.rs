@@ -57,6 +57,14 @@ use crate::catalogue::*;
 use crate::graph::*;
 
 use std::collections::HashMap;
+use crossbeam::{Receiver, Sender};
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+pub enum CanvasMessage {
+    Exit,
+}
 
 ///
 /// Represents a node-editing canvas window.
@@ -70,6 +78,9 @@ pub struct NodeMetaCanvasV1 {
     pub instance: Option<VersionInfo>,
     /// Actively loaded and running nodes that belong to this canvas, keyed by their instance UUID within the graph file.
     pub nodes: HashMap<uuid::Uuid, Aid>,
+    /// Comms to the actual editor window.
+    /// Receiver is not necessary as the window will send messages directly to the node actor.
+    pub send_to_editor_window: Option<Sender<CanvasMessage>>,
 }
 use log::*;
 
@@ -133,7 +144,7 @@ impl Nodeable for NodeMetaCanvasV1 {
     fn handle_receive(
         &mut self,
         _node: &mut Node,
-        _context: &Context,
+        context: &Context,
         receiver: &uuid::Uuid,
         _message: &Option<axiom::message::Message>,
     ) {
@@ -142,9 +153,28 @@ impl Nodeable for NodeMetaCanvasV1 {
             id_edit if id_edit == &uuid::Uuid::parse_str("7c5c2794-eb60-4661-9d25-585e1226233e").unwrap() => {
                 info!("canvas edit");
                 //Counter::run(iced::Settings::default());
-                super::editor::run_canvas_editor();
+                let (send_to_editor_window, recv_from_editor_window) = crossbeam::unbounded();
+                self.send_to_editor_window = Some(send_to_editor_window);
+                let node_aid = context.aid.clone();
+                std::thread::spawn(|| super::editor::run_canvas_editor(node_aid, recv_from_editor_window));
             }
             _ => {}
+        }
+    }
+    // Handle messages, most likely generated from the actual window thread.
+    fn handle_message(
+        &mut self,
+        node: &mut Node,
+        _context: &Context,
+        message: &Message
+    ) {
+        if let Some(msg) = message.content_as::<CanvasMessage>() {
+            match &*msg {
+                CanvasMessage::Exit => {
+                    let _ = node.controller.send_new(crate::engine::ControllerCommand::StopWaitingForNewMessages);
+                }
+                _ => {}
+            }
         }
     }
 }
@@ -153,7 +183,7 @@ use std::sync::{Arc, Mutex};
 
 impl NodeMetaCanvasV1 {
     pub fn new(controller: Aid, catalogue: Arc<Mutex<Catalogue>>, instance_id: uuid::Uuid) -> Node {
-        let process = Self { graph: None, instance: None, nodes: HashMap::new() };
+        let process = Self { graph: None, instance: None, nodes: HashMap::new(), send_to_editor_window: None };
         Node::new(
             NodeInstanceInfo {
                 uuid: instance_id,
