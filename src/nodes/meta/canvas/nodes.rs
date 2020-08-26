@@ -1,4 +1,4 @@
-use amethyst::ecs::prelude::*;
+use specs::prelude::*;
 use crate::graph::*;
 
 pub struct NodeComponent {
