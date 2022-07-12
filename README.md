@@ -10,6 +10,8 @@ This project does not even have much code behind it yet. I am building out the s
 
 Right now the project can load libraries from the internal libraries in the root workspace as well as any libraries in your Documents folder.
 
+Edit: I am now foxusing development on the Arcana VR editor project. These two projects will be developed side by side, with ProcFlow as its core. Note that I still intend on building out editors for normal desktop mode operation. You should be able to double click and open a graph in Windows (or Linux when I get there in time) to edit that node graph. Node positions will still need to be in 3d, so I may have to extend it out so that 2d coord and 3d coords can both be stored.
+
 ## Build Notes
 
 This project uses the shaderc crate, and because of such requires Python, CMake, and and C++ Compiler to be run by CMake. Also, it requires Ninja build on Windows. I don't like that anymore than you do, but unless someone writes a parser, AST generator, and SPIRV bytecode generator, and then puts them together, it will remain here until I am finished prototyping shaders. By all means I can just run shaderc on the GLSL shaders and actually just use bytecode in the programming, negating the need for the shaderc crate.
