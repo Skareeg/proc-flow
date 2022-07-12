@@ -10,7 +10,7 @@ This project does not even have much code behind it yet. I am building out the s
 
 Right now the project can load libraries from the internal libraries in the root workspace as well as any libraries in your Documents folder.
 
-Edit: I am now foxusing development on the Arcana VR editor project. These two projects will be developed side by side, with ProcFlow as its core. Note that I still intend on building out editors for normal desktop mode operation. You should be able to double click and open a graph in Windows (or Linux when I get there in time) to edit that node graph. Node positions will still need to be in 3d, so I may have to extend it out so that 2d coord and 3d coords can both be stored.
+Edit: I am now focusing development on the Arcana VR editor project. These two projects will be developed side by side, with ProcFlow as its core. Note that I still intend on building out editors for normal desktop mode operation. You should be able to double click and open a graph in Windows (or Linux when I get there in time) to edit that node graph. Node positions will still need to be in 3d, so I may have to extend it out so that 2d coord and 3d coords can both be stored.
 
 ## Build Notes
 
